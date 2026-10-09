@@ -1,0 +1,18 @@
+# 1. Install PHP dependencies
+composer install
+
+# 2. Create their local configuration file
+create .env file 
+check example here -> .env.example
+
+# 3. Generate the application encryption key
+php artisan key:generate
+
+# 4. Install JavaScript dependencies & compile assets
+npm install && npm run dev
+
+# 5. Link the public storage directory
+php artisan storage:link
+
+# 5. Wamoy database?
+php artisan migrate

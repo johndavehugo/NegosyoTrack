@@ -1,0 +1,37 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+ 
+.fi-ta-table > thead > tr { 
+    @apply divide-x divide-gray-200 dark:divide-white/5;
+}
+ 
+.fi-ta-row {
+    @apply divide-x divide-gray-200 dark:divide-white/5;
+} 
+
+.fi-fo-toggle-buttons.juridical-status-toggle .fi-btn {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding-block: 0;
+    min-height: 4rem;
+}
+
+.msme-form .fi-input-wrp:focus-within:not(.fi-invalid) {
+    --tw-ring-color: #588ffd;
+}
+
+.msme-form .fi-input-wrp:has(input[readonly]):focus-within {
+    --tw-ring-color: #cdcfd3af;
+}
+
+.msme-form .fi-input-wrp:has(input[readonly]) {
+    background-color: #cdcfd391;
+}
+
+.dark .msme-form .fi-input-wrp:has(input[readonly]) {
+    background-color: #ffffff25;
+}
