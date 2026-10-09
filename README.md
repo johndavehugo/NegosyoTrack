@@ -1,58 +1,155 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
-
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+  <img src="public/images/logo-text.png" width="320" alt="NegosyoTrack Logo">
 </p>
 
-## About Laravel
+<p align="center"><strong>MSME registry and economic mapping for the San Carlos City Negosyo Center</strong></p>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+<p align="center">
+  <img src="https://img.shields.io/badge/PHP-8.4-777BB4?logo=php&logoColor=white" alt="PHP 8.4">
+  <img src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white" alt="Laravel 13">
+  <img src="https://img.shields.io/badge/Filament-5-EB8C39?logo=filament&logoColor=white" alt="Filament 5">
+  <img src="https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white" alt="MySQL">
+  <img src="https://img.shields.io/badge/MapLibre-396CB2?logo=maplibre&logoColor=white" alt="MapLibre">
+  <img src="https://img.shields.io/badge/License-Proprietary-lightgrey" alt="Proprietary">
+</p>
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## About
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+NegosyoTrack is a web-based management system built for the San Carlos City Negosyo Center, digitizing how the local government unit tracks, supports, and plans around its micro, small, and medium enterprises (MSMEs). It runs on Laravel with a Filament administration panel, backed by MySQL and a versioned JSON API that every module reads and writes through — one source of truth across the whole system.
 
-## Learning Laravel
+At its core is the MSME registry: juridical businesses, their employers, and their addresses. Business creation runs through a guided two-step wizard with cascading region–province–city–barangay selects and live SCIMS search that autocompletes records from the external registry, while updates flow through dedicated API endpoints for business details, employer data, addresses, status changes, and renewals.
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Built on top of the registry is the Economic Map module — interactive MapLibre-powered maps turning records into decision support: hotspot, distribution, risk, and opportunity views, plus a workbench for geocoding unmapped records. Calamity monitoring (events, incidents, damage costs) feeds the risk model, and price monitoring (agencies, commodities, prevailing vs. SRP prices) covers market oversight. One workspace for registration, disaster response, market monitoring, and economic planning.
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Features
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### MSME Registry
 
-## Agentic Development
+Businesses, employers, and addresses with full list, view, create, and edit flows — search, filters, category badges, and status management included.
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+![Businesses table](public/images/readme/business_table.png)
+
+### Guided Creation Wizard
+
+Two-step business + employer capture with SCIMS registry search that autocompletes the form, cascading Philippine address dropdowns, and inline validation.
+
+![Create wizard](public/images/readme/wizard_step_1.png)
+
+### Business Profiles
+
+Full record view across personal, business, and address sections — contact and financial editing, status changes, and renewals, all synced through the API.
+
+![Business profile](public/images/readme/view_business.png)
+
+### Economic Hotspot Map
+
+Business concentration per barangay with ranked lists, per-barangay drill-down pins, and area search with summaries.
+
+![Hotspot map](public/images/readme/hotspot_map.png)
+
+### Industry Distribution Map
+
+Seventeen-sector breakdown with a filterable sector list, legend, totals, and a combined sector-share view.
+
+![Distribution map](public/images/readme/distribution_map.png)
+
+### Location Workbench
+
+Every address missing coordinates, in one table — drop a pin on the mini-map or type coordinates to locate records, with changes reflected on the maps immediately.
+
+![Unset locations](public/images/readme/unset_locations.png)
+
+### Sign-in
+
+![Login](public/images/readme/login_page.png)
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Language | PHP 8.4 |
+| Framework | Laravel 13 |
+| Admin panel | Filament 5 (Livewire 4) |
+| Database | MySQL |
+| Maps | MapLibre GL 6 (vendored, OSM raster tiles) |
+| Charts | Chart.js 4 |
+| Styling | Tailwind CSS 4 |
+| Build | Vite |
+
+## API Overview
+
+All modules consume these JSON endpoints (`routes/api.php`):
+
+| Method | Endpoint | Purpose |
+|---|---|---|
+| `GET` | `/api/msme` | Business list (supports `?search=`) |
+| `POST` | `/api/msme` | Create business + employer + addresses |
+| `PUT` | `/api/msme/employer/{entity_no}` | Update employer |
+| `PUT` | `/api/msme/juridical/{entity_no}` | Update business |
+| `PUT` | `/api/msme/address/{address}` | Update address |
+| `PATCH` | `/api/msme/status/{juridical}` | Change business status |
+| `PATCH` | `/api/msme/renew/{juridical}` | Renew business |
+| `PATCH` | `/api/msme/location/{address}` | Save coordinates |
+
+## Getting Started
 
 ```bash
-composer require laravel/boost --dev
+# 1. Install dependencies
+composer install
+npm install
 
-php artisan boost:install
+# 2. Configure environment
+cp .env.example .env
+php artisan key:generate
+# → set DB_CONNECTION, DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD
+
+# 3. Build frontend assets
+npm run build
+
+# 4. Migrate (full schema ships in database/migrations)
+php artisan migrate
+
+# 5. Serve (or use Laravel Herd: https://herd.laravel.com)
+php artisan serve
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Then sign in at the app URL with an existing user account.
 
-## Contributing
+## Project Structure
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```text
+app/
+├── Filament/
+│   ├── Pages/EconomicMap/        # Hotspot, Distribution, Risk, Opportunity, Business Locations
+│   └── Resources/
+│       ├── MsmeManagement/Juridicals/   # Business resource, wizard, tables, schemas
+│       ├── CalamityMonitoring/          # Calamity resources
+│       └── PriceMonitoring/             # Price monitoring resources
+├── Http/Controllers/Api/
+│   └── MsmeController.php        # msme.* JSON endpoints
+├── Models/
+│   ├── MsmeManagement/           # Juridical, Employer, Address
+│   └── PriceMonitoring/          # Agency, ...
+└── Services/
+    ├── ScimsApiService.php       # SCIMS registry client
+    ├── AddressApiService.php     # Philippine address reference data
+    ├── AddressManager.php        # Cascading dropdown orchestration
+    ├── EconomicMapService.php    # Map aggregates (hotspot, distribution, search)
+    ├── EconomicMap/CalamityFeed.php  # Damage history feed
+    └── Industries.php            # Canonical 17-sector list
+config/
+└── economic-map.php              # Map bands, sector colors, cache TTL
+routes/
+└── api.php                       # API endpoint definitions
+```
 
-## Code of Conduct
+## Roadmap
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+- [ ] Risk + Opportunity tabs live (hazard ratings, tourism/agriculture/population sources)
+- [ ] Price-pressure map layer once price monitoring matures
+- [ ] Barangay boundary overlays from LGU GIS shapefiles
+- [ ] Calamity + price module get-APIs feeding the map service directly
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Proprietary — internal use of the San Carlos City Government. All rights reserved. Unauthorized copying, distribution, or use outside the Negosyo Center is prohibited.
