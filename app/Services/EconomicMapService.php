@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\Industries;
 use App\Services\EconomicMap\CalamityFeed;use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -16,7 +17,7 @@ class EconomicMapService
 {
     /**
      * Industry keyword rules evaluated in order. First match wins,
-     * mirroring the legacy classifier. Keys match Industries::All().
+     * mirroring the legacy classifier. Keys match Industries::Array().
      */
     protected const SECTOR_RULES = [
         ['sector' => 'AGRICULTURE', 'keywords' => ['AGRICULTUR', 'FARM', 'LIVESTOCK', 'POULTRY', 'CROPS', 'PLANTATION', 'AGRI']],
@@ -117,8 +118,8 @@ class EconomicMapService
     {
         $line = strtoupper(trim((string) $line));
 
-        // Values already canonical per Industries::All() pass straight through.
-        if ($line !== '' && array_key_exists($line, Industries::All())) {
+        // Values already canonical per Industries::Array() pass straight through.
+        if ($line !== '' && in_array($line, Industries::Array(), true)) {
             return $line;
         }
 
@@ -133,10 +134,10 @@ class EconomicMapService
         return static::DEFAULT_SECTOR;
     }
 
-    /** Canonical 17-sector list — the single authority is Industries::All(). */
+    /** Canonical 17-sector list — the single authority is Industries::Array(). */
     public static function sectors(): array
     {
-        return array_keys(Industries::All());
+        return Industries::Array();
     }
 
     public function sectorColor(string $sector): string

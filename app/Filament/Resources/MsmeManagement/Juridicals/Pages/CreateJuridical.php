@@ -5,7 +5,7 @@ namespace App\Filament\Resources\MsmeManagement\Juridicals\Pages;
 use App\Filament\Resources\MsmeManagement\Juridicals\JuridicalResource;
 use App\Services\AddressApiService;
 use App\Services\AddressManager;
-use App\Services\Industries;
+use App\Enums\Industries;
 use App\Services\ScimsApiService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -128,7 +128,7 @@ class CreateJuridical extends CreateRecord
         // option hard-blocks required validation with no way for the user
         // to have caused it. Leave it blank for a manual pick instead.
         $industry = $business['line_of_industry'] ?? null;
-        $industry = array_key_exists($industry, Industries::All()) ? $industry : null;
+        $industry = in_array($industry, Industries::Array(), true) ? $industry : null;
 
         $gender = $employer['gender'] ?? null;
         $gender = in_array($gender, ['Male', 'Female'], true) ? $gender : null;
@@ -231,7 +231,7 @@ class CreateJuridical extends CreateRecord
 
                             Select::make('line_of_industry')
                                 ->label('Line of Industry')
-                                ->options(Industries::All())
+                                ->options(Industries::FillSelect())
                                 ->prefixIcon(Heroicon::Briefcase)
                                 ->searchable()
                                 ->required(),

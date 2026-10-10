@@ -3,7 +3,7 @@
 namespace App\Filament\Resources\MsmeManagement\Juridicals\Schemas;
 
 use App\Models\MsmeManagement\Juridical;
-use App\Services\Industries;
+use App\Enums\Industries;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -63,7 +63,7 @@ class BusinessForm
 
                                         Select::make('line_of_industry')
                                             ->label('Line of Industry')
-                                            ->options(Industries::All()),
+                                            ->options(Industries::FillSelect()),
 
                                         TextInput::make('capitalization')
                                             ->label('Capitalization')
