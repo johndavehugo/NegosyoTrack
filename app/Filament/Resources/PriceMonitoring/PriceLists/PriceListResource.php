@@ -17,11 +17,17 @@ use Filament\Tables\Table;
 class PriceListResource extends Resource
 {
     protected static ?string $model = Commodity::class;
+
     protected static ?string $pluralModelLabel = 'Price Lists';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::PresentationChartLine;
+
     protected static ?string $recordTitleAttribute = 'price_list';
+
     protected static ?string $navigationLabel = 'Price List';
+
     protected static ?int $navigationSort = 1;
+
     public static function getNavigationGroup(): ?string
     {
         return 'Price Monitoring';

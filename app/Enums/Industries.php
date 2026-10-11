@@ -45,15 +45,18 @@ enum Industries: string
         };
     }
 
-    public static function FillSelect() :array {
+    public static function FillSelect(): array
+    {
         $options = [];
         foreach (self::cases() as $case) {
             $options[$case->value] = $case->Label();
         }
+
         return $options;
     }
 
-    public static function Array() :array{
+    public static function Array(): array
+    {
         return array_column(self::cases(), 'value');
     }
 }

@@ -2,8 +2,8 @@
 
 namespace App\Filament\Resources\MsmeManagement\Juridicals\Schemas;
 
-use App\Models\MsmeManagement\Juridical;
 use App\Enums\Industries;
+use App\Models\MsmeManagement\Juridical;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -13,7 +13,6 @@ use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Grid;
-use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
@@ -74,8 +73,8 @@ class BusinessForm
                                             ])
                                             ->formatStateUsing(fn ($state) => filled($state)
                                                 ? number_format((float) $state, 2, '.', ',')
-                                                : null),  
-                                    ])                             
+                                                : null),
+                                    ]),
                             ]),
 
                         Section::make('Record Information')

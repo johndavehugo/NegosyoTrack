@@ -73,11 +73,11 @@ class CommoditiesResource extends Resource
                     ->color(Color::Yellow),
                 // DeleteAction::make(),
             ]);
-            // ->toolbarActions([
-            //     BulkActionGroup::make([
-            //         DeleteBulkAction::make(),
-            //     ]),
-            // ]);
+        // ->toolbarActions([
+        //     BulkActionGroup::make([
+        //         DeleteBulkAction::make(),
+        //     ]),
+        // ]);
     }
 
     public static function getPages(): array

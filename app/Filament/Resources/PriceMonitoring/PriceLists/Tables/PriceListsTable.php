@@ -11,7 +11,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Support\Colors\Color;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 
@@ -69,14 +68,14 @@ class PriceListsTable
                             ->required()
                             ->options([
                                 1 => 'Active',
-                                0 => 'Inactive'
-                            ])
+                                0 => 'Inactive',
+                            ]),
                     ]),
             ]);
-            // ->toolbarActions([
-            //     BulkActionGroup::make([
-            //         DeleteBulkAction::make(),
-            //     ]),
-            // ]);
+        // ->toolbarActions([
+        //     BulkActionGroup::make([
+        //         DeleteBulkAction::make(),
+        //     ]),
+        // ]);
     }
 }

@@ -1,6 +1,9 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+use App\Providers\Filament\NegosyotrackPanelProvider;
+
 return [
-    App\Providers\AppServiceProvider::class,
-    App\Providers\Filament\NegosyotrackPanelProvider::class,
+    AppServiceProvider::class,
+    NegosyotrackPanelProvider::class,
 ];

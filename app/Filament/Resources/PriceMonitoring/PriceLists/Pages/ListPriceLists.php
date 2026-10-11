@@ -11,11 +11,11 @@ class ListPriceLists extends ListRecords
 {
     protected static string $resource = PriceListResource::class;
 
-     protected static ?string $title = 'Price Monitoring';
+    protected static ?string $title = 'Price Monitoring';
 
-     protected function getHeaderWidgets(): array
+    protected function getHeaderWidgets(): array
     {
-        return [    
+        return [
             PriceListOverview::class,
         ];
     }

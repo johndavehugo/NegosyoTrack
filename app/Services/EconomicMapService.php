@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Enums\Industries;
-use App\Services\EconomicMap\CalamityFeed;use Illuminate\Http\Client\ConnectionException;
+use App\Services\EconomicMap\CalamityFeed;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+
 /**
  * Economic Map data layer. No models — everything derives from
  * GET /api/msme (cached), plus reference places via AddressApiService.
@@ -650,7 +652,8 @@ class EconomicMapService
         return [array_sum($lats) / count($lats), array_sum($lngs) / count($lngs)];
     }
 
-    /** Data bounds for fitting the map viewport. Null when nothing is plotted. */    public function bounds(): ?array
+    /** Data bounds for fitting the map viewport. Null when nothing is plotted. */
+    public function bounds(): ?array
     {
         $rows = $this->geocodedRows();
 

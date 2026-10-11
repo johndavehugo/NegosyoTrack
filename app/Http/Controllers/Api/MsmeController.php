@@ -13,7 +13,8 @@ use Str;
 
 class MsmeController extends Controller
 {
-    public function index(Request $request): JsonResponse{
+    public function index(Request $request): JsonResponse
+    {
 
         $query = Juridical::with(['address', 'employer.address']);
 
@@ -84,99 +85,100 @@ class MsmeController extends Controller
         ]);
     }
 
-    public function store(Request $request): JsonResponse{
+    public function store(Request $request): JsonResponse
+    {
         $validated = $request->validate([
-            //Business
-                'juri_entity_no' => 'required|string',
-                'juri_name' => 'required|string',
-                'juri_date_reg' => 'required|date',
-                'juri_capitalization' => 'numeric',
-                'juri_contact_no' => 'nullable|string|max:30',
-                'juri_contact_email' => 'nullable|email|max:150',
-                'juri_line_of_industry' => 'required|string',
-                'juri_region' => 'nullable|string|max:100',
-                'juri_province' => 'nullable|string|max:100',
-                'juri_city' => 'nullable|string|max:100',
-                'juri_barangay' => 'nullable|string|max:100',
-                'juri_subdivision' => 'nullable|string|max:100',
-                'juri_street' => 'nullable|string|max:150',
-                'juri_upblb_num' => 'nullable|string|max:50',
-                'juri_zip' => 'nullable|string|max:15',
+            // Business
+            'juri_entity_no' => 'required|string',
+            'juri_name' => 'required|string',
+            'juri_date_reg' => 'required|date',
+            'juri_capitalization' => 'numeric',
+            'juri_contact_no' => 'nullable|string|max:30',
+            'juri_contact_email' => 'nullable|email|max:150',
+            'juri_line_of_industry' => 'required|string',
+            'juri_region' => 'nullable|string|max:100',
+            'juri_province' => 'nullable|string|max:100',
+            'juri_city' => 'nullable|string|max:100',
+            'juri_barangay' => 'nullable|string|max:100',
+            'juri_subdivision' => 'nullable|string|max:100',
+            'juri_street' => 'nullable|string|max:150',
+            'juri_upblb_num' => 'nullable|string|max:50',
+            'juri_zip' => 'nullable|string|max:15',
 
-            //Employer           
-                'emp_entity_no' => 'required|string',
-                'emp_full_name' => 'required|string',
-                'emp_gender' => 'required|string',
-                'emp_birth_date' => 'required|date',
-                'emp_contact_no' => 'nullable|string|max:30',
-                'emp_email' => 'nullable|email|max:150',
-                'emp_special_category' => 'required|string|max:255',
-                'emp_region' => 'nullable|string|max:100',
-                'emp_province' => 'nullable|string|max:100',
-                'emp_city' => 'nullable|string|max:100',
-                'emp_barangay' => 'nullable|string|max:100',
-                'emp_subdivision' => 'nullable|string|max:100',
-                'emp_street' => 'nullable|string|max:150',
-                'emp_upblb_num' => 'nullable|string|max:50',
-                'emp_zip' => 'nullable|string|max:15',
+            // Employer
+            'emp_entity_no' => 'required|string',
+            'emp_full_name' => 'required|string',
+            'emp_gender' => 'required|string',
+            'emp_birth_date' => 'required|date',
+            'emp_contact_no' => 'nullable|string|max:30',
+            'emp_email' => 'nullable|email|max:150',
+            'emp_special_category' => 'required|string|max:255',
+            'emp_region' => 'nullable|string|max:100',
+            'emp_province' => 'nullable|string|max:100',
+            'emp_city' => 'nullable|string|max:100',
+            'emp_barangay' => 'nullable|string|max:100',
+            'emp_subdivision' => 'nullable|string|max:100',
+            'emp_street' => 'nullable|string|max:150',
+            'emp_upblb_num' => 'nullable|string|max:50',
+            'emp_zip' => 'nullable|string|max:15',
 
+        ]);
+
+        DB::transaction(function () use ($validated) {
+            $juri_id = 'jur-'.Str::uuid7();
+            $emp_id = 'emp-'.Str::uuid7();
+            $emp_address_id = 'addr-'.Str::uuid7();
+            $juri_address_id = 'addr-'.Str::uuid7();
+
+            Address::create([
+                'id' => $juri_address_id,
+                'region' => $validated['juri_region'],
+                'province' => $validated['juri_province'],
+                'city' => $validated['juri_city'],
+                'barangay' => $validated['juri_barangay'],
+                'subdivision' => $validated['juri_subdivision'],
+                'street' => $validated['juri_street'],
+                'upblb_num' => $validated['juri_upblb_num'],
+                'zip' => $validated['juri_zip'],
             ]);
 
-            DB::transaction(function() use($validated){
-                $juri_id = 'jur-' . Str::uuid7();
-                $emp_id = 'emp-' . Str::uuid7();
-                $emp_address_id = 'addr-' . Str::uuid7();
-                $juri_address_id = 'addr-' . Str::uuid7();
+            Address::create([
+                'id' => $emp_address_id,
+                'region' => $validated['emp_region'],
+                'province' => $validated['emp_province'],
+                'city' => $validated['emp_city'],
+                'barangay' => $validated['emp_barangay'],
+                'subdivision' => $validated['emp_subdivision'],
+                'street' => $validated['emp_street'],
+                'upblb_num' => $validated['emp_upblb_num'],
+                'zip' => $validated['emp_zip'],
+            ]);
 
-                Address::create([
-                    'id' => $juri_address_id,
-                    'region' => $validated['juri_region'],
-                    'province' => $validated['juri_province'],
-                    'city' => $validated['juri_city'],
-                    'barangay' => $validated['juri_barangay'],
-                    'subdivision' => $validated['juri_subdivision'],
-                    'street' => $validated['juri_street'],
-                    'upblb_num' => $validated['juri_upblb_num'],
-                    'zip' => $validated['juri_zip'],
-                ]);
+            Employer::create([
+                'id' => $emp_id,
+                'address_id' => $emp_address_id,
+                'entity_no' => $validated['emp_entity_no'],
+                'full_name' => $validated['emp_full_name'],
+                'gender' => $validated['emp_gender'],
+                'birth_date' => $validated['emp_birth_date'],
+                'contact_no' => $validated['emp_contact_no'],
+                'email' => $validated['emp_email'],
+                'special_category' => $validated['emp_special_category'],
+            ]);
 
-                Address::create([
-                    'id' => $emp_address_id,
-                    'region' => $validated['emp_region'],
-                    'province' => $validated['emp_province'],
-                    'city' => $validated['emp_city'],
-                    'barangay' => $validated['emp_barangay'],
-                    'subdivision' => $validated['emp_subdivision'],
-                    'street' => $validated['emp_street'],
-                    'upblb_num' => $validated['emp_upblb_num'],
-                    'zip' => $validated['emp_zip'],
-                ]);
-
-                Employer::create([
-                    'id' => $emp_id,
-                    'address_id' => $emp_address_id,
-                    'entity_no' => $validated['emp_entity_no'],
-                    'full_name' => $validated['emp_full_name'],
-                    'gender' => $validated['emp_gender'],
-                    'birth_date' => $validated['emp_birth_date'],
-                    'contact_no' => $validated['emp_contact_no'],
-                    'email' => $validated['emp_email'],
-                    'special_category' => $validated['emp_special_category'],
-                ]);
-
-                Juridical::create([
-                    'id' => $juri_id,
-                    'employer_id' => $emp_id,
-                    'address_id' => $juri_address_id,
-                    'entity_no' => $validated['juri_entity_no'],
-                    'name' => $validated['juri_name'],
-                    'date_reg' => $validated['juri_date_reg'],
-                    'contact_no' => $validated['juri_contact_no'],
-                    'contact_email' => $validated['juri_contact_email'],
-                    'line_of_industry' => $validated['juri_line_of_industry'],
-                    'capitalization' => $validated['juri_capitalization'],
-                ]);
-            });
+            Juridical::create([
+                'id' => $juri_id,
+                'employer_id' => $emp_id,
+                'address_id' => $juri_address_id,
+                'entity_no' => $validated['juri_entity_no'],
+                'name' => $validated['juri_name'],
+                'date_reg' => $validated['juri_date_reg'],
+                'contact_no' => $validated['juri_contact_no'],
+                'contact_email' => $validated['juri_contact_email'],
+                'line_of_industry' => $validated['juri_line_of_industry'],
+                'capitalization' => $validated['juri_capitalization'],
+            ]);
+        });
 
         return response()->json([
             'status' => 'success',
@@ -270,7 +272,8 @@ class MsmeController extends Controller
             ]);
     }
 
-    public function setLocation(Request $request, Address $address) {
+    public function setLocation(Request $request, Address $address)
+    {
         $validated = $request->validate([
             'longitude' => 'required|decimal:0,7',
             'latitude' => 'required|decimal:0,7',

@@ -26,6 +26,7 @@ class AgenciesResource extends Resource
     protected static ?string $recordTitleAttribute = 'agency';
 
     protected static ?int $navigationSort = 4;
+
     public static function getNavigationGroup(): ?string
     {
         return 'Price Monitoring';
@@ -40,7 +41,7 @@ class AgenciesResource extends Resource
                 TextInput::make('name')
                     ->required()
                     ->unique(),
-                TextInput::make('coverage')
+                TextInput::make('coverage'),
             ]);
     }
 
@@ -55,7 +56,7 @@ class AgenciesResource extends Resource
                     ->sortable()
                     ->searchable(),
                 TextColumn::make('coverage')
-                    ->sortable()
+                    ->sortable(),
             ])
             ->filters([
                 //
@@ -65,11 +66,11 @@ class AgenciesResource extends Resource
                     ->color(Color::Yellow),
                 // DeleteAction::make(),
             ]);
-            // ->toolbarActions([
-            //     BulkActionGroup::make([
-            //         DeleteBulkAction::make(),
-            //     ]),
-            // ]);
+        // ->toolbarActions([
+        //     BulkActionGroup::make([
+        //         DeleteBulkAction::make(),
+        //     ]),
+        // ]);
     }
 
     public static function getPages(): array

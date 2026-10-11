@@ -16,8 +16,10 @@ use Filament\Support\Icons\Heroicon;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 
-class AddressForm {
-    public static function make(Schema $schema, ViewBusiness $page,): Schema {
+class AddressForm
+{
+    public static function make(Schema $schema, ViewBusiness $page): Schema
+    {
         return $schema
             ->components([
                 Tabs::make()
@@ -37,8 +39,8 @@ class AddressForm {
                                             $page->getAddressManager()
                                                 ->loadBusinessProvinces($page, $state);
                                             if (blank($page->businessProvinceOptions)) {
-                                                    $page->getAddressManager()
-                                                        ->loadBusinessCitiesByRegion($page,$state);
+                                                $page->getAddressManager()
+                                                    ->loadBusinessCitiesByRegion($page, $state);
                                             }
                                         }
                                     }),
@@ -56,6 +58,7 @@ class AddressForm {
                                             if (filled($state)) {
                                                 $page->getAddressManager()
                                                     ->loadBusinessCities($page, $state);
+
                                                 return;
                                             }
                                             $region = $page->addressData['business_region'] ?? null;
@@ -112,7 +115,7 @@ class AddressForm {
 
                                         if (filled($state)) {
                                             $page->getAddressManager()
-                                                ->loadEmployerProvinces($page,$state);
+                                                ->loadEmployerProvinces($page, $state);
                                             if (blank($page->employerProvinceOptions)) {
                                                 $page->getAddressManager()
                                                     ->loadEmployerCitiesByRegion($page, $state);
@@ -132,6 +135,7 @@ class AddressForm {
                                         if (filled($state)) {
                                             $page->getAddressManager()
                                                 ->loadEmployerCities($page, $state);
+
                                             return;
                                         }
 
@@ -183,7 +187,7 @@ class AddressForm {
                         ->label('Save')
                         ->color('success')
                         ->icon(Heroicon::Check)
-                        ->action(function (Juridical $record, $livewire,): void {
+                        ->action(function (Juridical $record, $livewire): void {
                             $data = $livewire->addressData;
                             $addressManager = $livewire->getAddressManager();
 
@@ -205,33 +209,33 @@ class AddressForm {
 
                             try {
                                 $juriResponse = Http::acceptJson()->put(
-                                    route('msme.address.update', ['address' => $record->address->id,]),
-                                        [
-                                            'region' => $businessAddress['region'],
-                                            'province' => $businessAddress['province'],
-                                            'city' => $businessAddress['city'],
-                                            'barangay' => $businessAddress['barangay'],
-                                            'subdivision' => $data['business_subdivision'] ?? null,
-                                            'street' => $data['business_street'] ?? null,
-                                            'upblb_num' => $data['business_upblb_num'] ?? null,
-                                            'zip' => $data['business_zip'] ?? null,
-                                        ]
+                                    route('msme.address.update', ['address' => $record->address->id]),
+                                    [
+                                        'region' => $businessAddress['region'],
+                                        'province' => $businessAddress['province'],
+                                        'city' => $businessAddress['city'],
+                                        'barangay' => $businessAddress['barangay'],
+                                        'subdivision' => $data['business_subdivision'] ?? null,
+                                        'street' => $data['business_street'] ?? null,
+                                        'upblb_num' => $data['business_upblb_num'] ?? null,
+                                        'zip' => $data['business_zip'] ?? null,
+                                    ]
                                 );
 
                                 $juriMessage = $juriResponse->json('message');
 
                                 $empResponse = Http::acceptJson()->put(
-                                    route('msme.address.update', ['address' => $record->employer->address->id,]),
-                                        [
-                                            'region' => $employerAddress['region'],
-                                            'province' => $employerAddress['province'],
-                                            'city' => $employerAddress['city'],
-                                            'barangay' => $employerAddress['barangay'],
-                                            'subdivision' => $data['employer_subdivision'] ?? null,
-                                            'street' => $data['employer_street'] ?? null,
-                                            'upblb_num' => $data['employer_upblb_num'] ?? null,
-                                            'zip' => $data['employer_zip'] ?? null,
-                                        ]
+                                    route('msme.address.update', ['address' => $record->employer->address->id]),
+                                    [
+                                        'region' => $employerAddress['region'],
+                                        'province' => $employerAddress['province'],
+                                        'city' => $employerAddress['city'],
+                                        'barangay' => $employerAddress['barangay'],
+                                        'subdivision' => $data['employer_subdivision'] ?? null,
+                                        'street' => $data['employer_street'] ?? null,
+                                        'upblb_num' => $data['employer_upblb_num'] ?? null,
+                                        'zip' => $data['employer_zip'] ?? null,
+                                    ]
                                 );
 
                                 $empMessage = $empResponse->json('message');
@@ -241,7 +245,8 @@ class AddressForm {
                                     ->title('Could not reach the server')
                                     ->danger()
                                     ->send();
-                                    return;
+
+                                return;
                             }
 
                             if ($juriResponse->successful() && $empResponse->successful()) {
@@ -252,7 +257,7 @@ class AddressForm {
                             } else {
                                 Notification::make()
                                     ->title('Update Failed')
-                                    ->body(($juriMessage). ' ' . $empMessage)
+                                    ->body(($juriMessage).' '.$empMessage)
                                     ->danger()
                                     ->send();
                             }

@@ -14,11 +14,10 @@ class PriceListOverview extends StatsOverviewWidget
     {
         return [
             Stat::make('', Commodity::count())
-            ->description('Monitored Items')
-            ->descriptionIcon(Heroicon::ArchiveBox)
-            ->color(Color::Blue),
+                ->description('Monitored Items')
+                ->descriptionIcon(Heroicon::ArchiveBox)
+                ->color(Color::Blue),
 
-        
             Stat::make('', Commodity::where('is_active', 1)->count())
                 ->description('Active Items')
                 ->descriptionIcon(Heroicon::CheckBadge)

@@ -14,7 +14,7 @@ class Category extends Model
     {
         return $this->hasMany(Commodity::class);
     }
-    
+
     public function agency()
     {
         return $this->belongsTo(Agency::class);

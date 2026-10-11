@@ -2,12 +2,11 @@
 
 namespace App\Filament\Resources\MsmeManagement\Juridicals\Pages;
 
+use App\Enums\Industries;
 use App\Filament\Resources\MsmeManagement\Juridicals\JuridicalResource;
 use App\Services\AddressApiService;
 use App\Services\AddressManager;
-use App\Enums\Industries;
 use App\Services\ScimsApiService;
-use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -23,16 +22,24 @@ use Illuminate\Support\Facades\Http;
 class CreateJuridical extends CreateRecord
 {
     use CreateRecord\Concerns\HasWizard;
-    protected static string $resource = JuridicalResource::class;
-    public array $businessRegionOptions = [];
-    public array $businessProvinceOptions = [];
-    public array $businessCityOptions = [];
-    public array $businessBarangayOptions = [];
-    public array $employerRegionOptions = [];
-    public array $employerProvinceOptions = [];
-    public array $employerCityOptions = [];
-    public array $employerBarangayOptions = [];
 
+    protected static string $resource = JuridicalResource::class;
+
+    public array $businessRegionOptions = [];
+
+    public array $businessProvinceOptions = [];
+
+    public array $businessCityOptions = [];
+
+    public array $businessBarangayOptions = [];
+
+    public array $employerRegionOptions = [];
+
+    public array $employerProvinceOptions = [];
+
+    public array $employerCityOptions = [];
+
+    public array $employerBarangayOptions = [];
 
     public function mount(): void
     {
@@ -185,6 +192,7 @@ class CreateJuridical extends CreateRecord
             ...$resolvedEmployer,
         ]));
     }
+
     protected function getSteps(): array
     {
         return [
@@ -501,115 +509,115 @@ class CreateJuridical extends CreateRecord
         ];
     }
 
-   public function create(bool $another = false): void
-{
-    $data = $this->form->getState();
+    public function create(bool $another = false): void
+    {
+        $data = $this->form->getState();
 
-    $addressManager = app(AddressManager::class);
+        $addressManager = app(AddressManager::class);
 
-    $businessAddress = $addressManager->resolveSelectedAddress(
-        $data['business_region'] ?? null,
-        $data['business_province'] ?? null,
-        $data['business_city'] ?? null,
-        $data['business_barangay'] ?? null,
-    );
-
-    $employerAddress = $addressManager->resolveSelectedAddress(
-        $data['employer_region'] ?? null,
-        $data['employer_province'] ?? null,
-        $data['employer_city'] ?? null,
-        $data['employer_barangay'] ?? null,
-    );
-
-    try {
-        $juridical = [
-            'juri_entity_no' => $data['entity_no'] ?? null,
-            'juri_name' => $data['name'] ?? null,
-            'juri_date_reg' => $data['date_reg'] ?? null,
-            'juri_capitalization' => str_replace(
-                ',',
-                '',
-                $data['capitalization'] ?? '0.00'
-            ),
-            'juri_contact_no' => $data['contact_no'] ?? null,
-            'juri_contact_email' => $data['contact_email'] ?? null,
-            'juri_line_of_industry' => $data['line_of_industry'] ?? null,
-
-            'juri_region' => $businessAddress['region'] ?? null,
-            'juri_province' => $businessAddress['province'] ?? null,
-            'juri_city' => $businessAddress['city'] ?? null,
-            'juri_barangay' => $businessAddress['barangay'] ?? null,
-
-            'juri_subdivision' => $data['business_subdivision'] ?? null,
-            'juri_street' => $data['business_street'] ?? null,
-            'juri_upblb_num' => $data['business_upblb_num'] ?? null,
-            'juri_zip' => $data['business_zip'] ?? null,
-        ];
-
-        $employer = [
-            'emp_entity_no' => $data['employer_entity_no'] ?? null,
-            'emp_full_name' => $data['full_name'] ?? null,
-            'emp_gender' => $data['gender'] ?? null,
-            'emp_birth_date' => $data['birth_date'] ?? null,
-            'emp_contact_no' => $data['employer_contact_no'] ?? null,
-            'emp_email' => $data['employer_email'] ?? null,
-            'emp_special_category' => $data['special_category'] ?? null,
-
-            'emp_region' => $employerAddress['region'] ?? null,
-            'emp_province' => $employerAddress['province'] ?? null,
-            'emp_city' => $employerAddress['city'] ?? null,
-            'emp_barangay' => $employerAddress['barangay'] ?? null,
-
-            'emp_subdivision' => $data['employer_subdivision'] ?? null,
-            'emp_street' => $data['employer_street'] ?? null,
-            'emp_upblb_num' => $data['employer_upblb_num'] ?? null,
-            'emp_zip' => $data['employer_zip'] ?? null,
-        ];
-
-        // Both shapes: the validator's nested-array rules resolve to FLAT
-        // keys (proven: its errors name juri_*/emp_* with no prefix), while
-        // the creation code reads $validated['juridical']['...'] NESTED.
-        // Send both until the controller standardizes on dot notation —
-        // then the flat copies come out and only the groups stay.
-        $response = Http::acceptJson()->post(
-            route('msme.store'),
-            array_merge(
-                $juridical,
-                $employer,
-                [
-                    'juridical' => $juridical,
-                    'employer' => $employer,
-                ],
-            ),
+        $businessAddress = $addressManager->resolveSelectedAddress(
+            $data['business_region'] ?? null,
+            $data['business_province'] ?? null,
+            $data['business_city'] ?? null,
+            $data['business_barangay'] ?? null,
         );
-    } catch (ConnectionException) {
+
+        $employerAddress = $addressManager->resolveSelectedAddress(
+            $data['employer_region'] ?? null,
+            $data['employer_province'] ?? null,
+            $data['employer_city'] ?? null,
+            $data['employer_barangay'] ?? null,
+        );
+
+        try {
+            $juridical = [
+                'juri_entity_no' => $data['entity_no'] ?? null,
+                'juri_name' => $data['name'] ?? null,
+                'juri_date_reg' => $data['date_reg'] ?? null,
+                'juri_capitalization' => str_replace(
+                    ',',
+                    '',
+                    $data['capitalization'] ?? '0.00'
+                ),
+                'juri_contact_no' => $data['contact_no'] ?? null,
+                'juri_contact_email' => $data['contact_email'] ?? null,
+                'juri_line_of_industry' => $data['line_of_industry'] ?? null,
+
+                'juri_region' => $businessAddress['region'] ?? null,
+                'juri_province' => $businessAddress['province'] ?? null,
+                'juri_city' => $businessAddress['city'] ?? null,
+                'juri_barangay' => $businessAddress['barangay'] ?? null,
+
+                'juri_subdivision' => $data['business_subdivision'] ?? null,
+                'juri_street' => $data['business_street'] ?? null,
+                'juri_upblb_num' => $data['business_upblb_num'] ?? null,
+                'juri_zip' => $data['business_zip'] ?? null,
+            ];
+
+            $employer = [
+                'emp_entity_no' => $data['employer_entity_no'] ?? null,
+                'emp_full_name' => $data['full_name'] ?? null,
+                'emp_gender' => $data['gender'] ?? null,
+                'emp_birth_date' => $data['birth_date'] ?? null,
+                'emp_contact_no' => $data['employer_contact_no'] ?? null,
+                'emp_email' => $data['employer_email'] ?? null,
+                'emp_special_category' => $data['special_category'] ?? null,
+
+                'emp_region' => $employerAddress['region'] ?? null,
+                'emp_province' => $employerAddress['province'] ?? null,
+                'emp_city' => $employerAddress['city'] ?? null,
+                'emp_barangay' => $employerAddress['barangay'] ?? null,
+
+                'emp_subdivision' => $data['employer_subdivision'] ?? null,
+                'emp_street' => $data['employer_street'] ?? null,
+                'emp_upblb_num' => $data['employer_upblb_num'] ?? null,
+                'emp_zip' => $data['employer_zip'] ?? null,
+            ];
+
+            // Both shapes: the validator's nested-array rules resolve to FLAT
+            // keys (proven: its errors name juri_*/emp_* with no prefix), while
+            // the creation code reads $validated['juridical']['...'] NESTED.
+            // Send both until the controller standardizes on dot notation —
+            // then the flat copies come out and only the groups stay.
+            $response = Http::acceptJson()->post(
+                route('msme.store'),
+                array_merge(
+                    $juridical,
+                    $employer,
+                    [
+                        'juridical' => $juridical,
+                        'employer' => $employer,
+                    ],
+                ),
+            );
+        } catch (ConnectionException) {
+            Notification::make()
+                ->title('Could not reach the server.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        $message = $response->json('message');
+
+        if ($response->successful()) {
+            Notification::make()
+                ->title($message ?? 'Business created successfully.')
+                ->success()
+                ->send();
+
+            $this->redirect(
+                JuridicalResource::getUrl('index'),
+                navigate: true,
+            );
+
+            return;
+        }
+
         Notification::make()
-            ->title('Could not reach the server.')
+            ->title($message ?? 'Failed to create business.')
             ->danger()
             ->send();
-
-        return;
     }
-
-    $message = $response->json('message');
-
-    if ($response->successful()) {
-        Notification::make()
-            ->title($message ?? 'Business created successfully.')
-            ->success()
-            ->send();
-
-        $this->redirect(
-            JuridicalResource::getUrl('index'),
-            navigate: true,
-        );
-
-        return;
-    }
-
-    Notification::make()
-        ->title($message ?? 'Failed to create business.')
-        ->danger()
-        ->send();
-}
 }

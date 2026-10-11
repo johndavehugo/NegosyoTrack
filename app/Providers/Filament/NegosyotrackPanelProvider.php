@@ -49,9 +49,9 @@ class NegosyotrackPanelProvider extends PanelProvider
 
                 NavigationGroup::make()
                     ->label('Price Monitoring'),
-                
+
                 NavigationGroup::make()
-                    ->label('Economic Map')
+                    ->label('Economic Map'),
             ])
 
             ->colors([

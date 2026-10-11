@@ -14,7 +14,8 @@ class AddressManager
     public function loadBusinessProvinces(
         ViewBusiness|CreateJuridical $page,
         string $regionPsgcId,
-    ): void {        $page->businessProvinceOptions = collect(
+    ): void {
+        $page->businessProvinceOptions = collect(
             $this->addressApiService->getProvinces($regionPsgcId)
         )
             ->pluck('name', 'psgc_id')

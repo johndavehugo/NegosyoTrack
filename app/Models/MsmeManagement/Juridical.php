@@ -2,9 +2,11 @@
 
 namespace App\Models\MsmeManagement;
 
+use App\Models\CalamityMonitoring\Incident;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Juridical extends Model
 {
@@ -47,5 +49,10 @@ class Juridical extends Model
     public function address(): BelongsTo
     {
         return $this->belongsTo(Address::class);
+    }
+
+    public function incident(): HasMany
+    {
+        return $this->hasMany(Incident::class);
     }
 }
