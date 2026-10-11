@@ -42,7 +42,8 @@ class PriceList extends Component
 
     public function getCategoriesProperty()
     {
-        return Category::when($this->agencyFilter, fn ($q) => $q->where('agency_id', $this->agencyFilter))
+        return Category::withCount(['commodities' => fn ($q) => $q->where('is_active', true)])
+            ->when($this->agencyFilter, fn ($q) => $q->where('agency_id', $this->agencyFilter))
             ->orderBy('name')
             ->get();
     }
