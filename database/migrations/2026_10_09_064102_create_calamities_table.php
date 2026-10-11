@@ -12,12 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('calamities', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id();
             $table->string('name', 150);
-            $table->enum('calamity_type', ['TYPHOON', 'FLOOD', 'EARTHQUAKE', 'FIRE', 'LANDSLIDE', 'OTHER']);
+            $table->string('calamity_type', 50);
             $table->date('declaration_date');
             $table->text('description')->nullable();
             $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->nullable();
         });
     }
 

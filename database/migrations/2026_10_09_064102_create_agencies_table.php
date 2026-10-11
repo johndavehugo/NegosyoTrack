@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('agencies', function (Blueprint $table) {
-            $table->bigIncrements('id');
+            $table->id();
             $table->string('code', 20)->unique('code');
             $table->string('name', 150);
-            $table->string('coverage')->nullable();
+            $table->string('coverage', 255)->nullable();
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent();
         });

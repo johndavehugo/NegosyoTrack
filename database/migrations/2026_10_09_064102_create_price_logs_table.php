@@ -12,12 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('price_logs', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->unsignedBigInteger('commodity_id')->index('idx_price_commodity');
-            $table->decimal('prevailing_price', 10);
+            $table->id();
+            $table->unsignedBigInteger('commodity_id');
+            $table->decimal('prevailing_price', 10, 2);
             $table->enum('status', ['ACTIVE', 'INACTIVE'])->default('ACTIVE');
-            $table->unsignedBigInteger('monitored_by_agency_id')->nullable()->index('idx_monitored_agency');
+            $table->unsignedBigInteger('monitored_by_agency_id')->nullable();
             $table->timestamp('monitored_at')->useCurrent();
+            $table->timestamp('created_at')->nullable();
+            $table->timestamp('updated_at')->nullable();
+            $table->index('commodity_id', 'idx_price_commodity');
+            $table->index('monitored_by_agency_id', 'idx_monitored_agency');
         });
     }
 

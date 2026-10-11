@@ -12,17 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('calamity_incidents', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->string('juridical_id', 100)->index('idx_juridical');
-            $table->unsignedBigInteger('calamity_id')->index('idx_calamity');
+            $table->id();
+            $table->string('juridical_id', 100);
+            $table->unsignedBigInteger('calamity_id');
             $table->date('date_occurred');
             $table->enum('nature_of_damage', ['PARTIAL', 'TOTAL']);
-            $table->decimal('estimated_cost_of_damages', 12);
+            $table->decimal('estimated_cost_of_damages', 12, 2);
             $table->text('remarks')->nullable();
-            $table->enum('status', ['PENDING_VERIFICATION', 'VERIFIED', 'AID_RELEASED'])->nullable()->default('VERIFIED');
+            $table->enum('status', ['PENDING_VERIFICATION', 'VERIFIED', 'AID_RELEASED'])->default('VERIFIED');
             $table->timestamp('created_at')->useCurrent();
-            $table->timestamp('updated_at')->useCurrentOnUpdate()->useCurrent();
-
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+            $table->index('juridical_id', 'idx_juridical');
+            $table->index('calamity_id', 'idx_calamity');
             $table->index(['date_occurred', 'nature_of_damage'], 'idx_damage_date');
         });
     }

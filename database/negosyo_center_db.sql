@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Oct 11, 2026 at 04:00 AM
+-- Generation Time: Oct 11, 2026 at 04:18 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -350,22 +350,23 @@ CREATE TABLE `commodity_categories` (
   `id` bigint(20) UNSIGNED NOT NULL,
   `agency_id` bigint(20) UNSIGNED NOT NULL,
   `name` varchar(100) NOT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `commodity_categories`
 --
 
-INSERT INTO `commodity_categories` (`id`, `agency_id`, `name`, `created_at`) VALUES
-(1, 1, 'Canned Goods & Processed Foods', '2026-08-03 05:15:08'),
-(2, 2, 'Grains & Rice', '2026-08-03 05:15:08'),
-(3, 2, 'Vegetables & Root Crops', '2026-08-03 05:15:08'),
-(4, 2, 'Livestock & Poultry Products', '2026-08-03 05:15:08'),
-(5, 3, 'Fuel & Petroleum Products', '2026-08-03 05:15:08'),
-(8, 2, 'Fruits', '2026-08-20 06:09:59'),
-(9, 1, 'Household Appliances', '2026-08-20 06:23:51'),
-(10, 3, 'Electricity', '2026-08-24 00:46:24');
+INSERT INTO `commodity_categories` (`id`, `agency_id`, `name`, `created_at`, `updated_at`) VALUES
+(1, 1, 'Canned Goods & Processed Foods', '2026-08-03 05:15:08', NULL),
+(2, 2, 'Grains & Rice', '2026-08-03 05:15:08', NULL),
+(3, 2, 'Vegetables & Root Crops', '2026-08-03 05:15:08', NULL),
+(4, 2, 'Livestock & Poultry Products', '2026-08-03 05:15:08', NULL),
+(5, 3, 'Fuel & Petroleum Products', '2026-08-03 05:15:08', NULL),
+(8, 2, 'Fruits', '2026-08-20 06:09:59', NULL),
+(9, 1, 'Household Appliances', '2026-08-20 06:23:51', NULL),
+(10, 3, 'Electricity', '2026-08-24 00:46:24', NULL);
 
 -- --------------------------------------------------------
 
@@ -572,26 +573,28 @@ CREATE TABLE `price_logs` (
   `prevailing_price` decimal(10,2) NOT NULL,
   `status` enum('ACTIVE','INACTIVE') NOT NULL DEFAULT 'ACTIVE',
   `monitored_by_agency_id` bigint(20) UNSIGNED DEFAULT NULL,
-  `monitored_at` timestamp NOT NULL DEFAULT current_timestamp()
+  `monitored_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `price_logs`
 --
 
-INSERT INTO `price_logs` (`id`, `commodity_id`, `prevailing_price`, `status`, `monitored_by_agency_id`, `monitored_at`) VALUES
-(39, 66, 0.00, 'ACTIVE', 3, '2026-08-20 06:17:35'),
-(40, 67, 0.00, 'ACTIVE', 1, '2026-08-20 06:19:30'),
-(41, 68, 0.00, 'ACTIVE', 2, '2026-08-20 06:17:57'),
-(42, 69, 0.00, 'ACTIVE', 3, '2026-08-20 05:50:49'),
-(43, 70, 0.00, 'ACTIVE', 2, '2026-08-20 06:15:48'),
-(44, 71, 0.00, 'ACTIVE', 2, '2026-08-20 06:15:53'),
-(45, 76, 0.00, 'ACTIVE', 2, '2026-08-20 06:16:02'),
-(46, 75, 0.00, 'ACTIVE', 2, '2026-08-20 06:16:06'),
-(47, 73, 0.00, 'ACTIVE', 2, '2026-08-20 06:17:16'),
-(48, 74, 0.00, 'ACTIVE', 2, '2026-08-20 06:17:21'),
-(49, 72, 0.00, 'ACTIVE', 2, '2026-08-20 06:18:02'),
-(50, 77, 0.00, 'ACTIVE', 1, '2026-08-20 06:19:23');
+INSERT INTO `price_logs` (`id`, `commodity_id`, `prevailing_price`, `status`, `monitored_by_agency_id`, `monitored_at`, `created_at`, `updated_at`) VALUES
+(39, 66, 0.00, 'ACTIVE', 3, '2026-08-20 06:17:35', NULL, NULL),
+(40, 67, 0.00, 'ACTIVE', 1, '2026-08-20 06:19:30', NULL, NULL),
+(41, 68, 0.00, 'ACTIVE', 2, '2026-08-20 06:17:57', NULL, NULL),
+(42, 69, 0.00, 'ACTIVE', 3, '2026-08-20 05:50:49', NULL, NULL),
+(43, 70, 0.00, 'ACTIVE', 2, '2026-08-20 06:15:48', NULL, NULL),
+(44, 71, 0.00, 'ACTIVE', 2, '2026-08-20 06:15:53', NULL, NULL),
+(45, 76, 0.00, 'ACTIVE', 2, '2026-08-20 06:16:02', NULL, NULL),
+(46, 75, 0.00, 'ACTIVE', 2, '2026-08-20 06:16:06', NULL, NULL),
+(47, 73, 0.00, 'ACTIVE', 2, '2026-08-20 06:17:16', NULL, NULL),
+(48, 74, 0.00, 'ACTIVE', 2, '2026-08-20 06:17:21', NULL, NULL),
+(49, 72, 0.00, 'ACTIVE', 2, '2026-08-20 06:18:02', NULL, NULL),
+(50, 77, 0.00, 'ACTIVE', 1, '2026-08-20 06:19:23', NULL, NULL);
 
 -- --------------------------------------------------------
 

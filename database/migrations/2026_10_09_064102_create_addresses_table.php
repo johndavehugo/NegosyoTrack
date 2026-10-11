@@ -25,7 +25,6 @@ return new class extends Migration
             $table->decimal('latitude', 10, 7)->nullable();
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent();
-
             $table->index(['city', 'barangay'], 'idx_address_location');
         });
     }

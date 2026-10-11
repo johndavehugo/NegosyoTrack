@@ -19,10 +19,11 @@ return new class extends Migration
             $table->date('birth_date');
             $table->string('contact_no', 30)->nullable();
             $table->string('email', 150)->nullable();
-            $table->string('special_category')->nullable();
-            $table->string('address_id', 100)->nullable()->index('employers_ibfk_1');
+            $table->string('special_category', 255)->nullable();
+            $table->string('address_id', 100)->nullable();
             $table->timestamp('created_at')->useCurrent();
-            $table->timestamp('updated_at')->useCurrentOnUpdate()->useCurrent();
+            $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
+            $table->index('address_id', 'employers_ibfk_1');
         });
     }
 

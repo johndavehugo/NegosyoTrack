@@ -12,10 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('commodity_categories', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->unsignedBigInteger('agency_id')->index('fk_category_agency');
+            $table->id();
+            $table->unsignedBigInteger('agency_id');
             $table->string('name', 100);
             $table->timestamp('created_at')->useCurrent();
+            $table->timestamp('updated_at')->nullable();
+            $table->index('agency_id', 'fk_category_agency');
         });
     }
 
