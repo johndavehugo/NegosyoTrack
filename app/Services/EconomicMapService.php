@@ -180,7 +180,7 @@ class EconomicMapService
 
         foreach ($groups as $key => $group) {
             arsort($group['names']);
-            $groups[$key]['barangay'] = (string) array_key_first($group['names']);
+            $groups[$key]['barangay'] = trim((string) array_key_first($group['names']));
             $lats = array_map(fn (array $r): float => (float) $r['juridical']['latitude'], $group['rows']);
             $lngs = array_map(fn (array $r): float => (float) $r['juridical']['longitude'], $group['rows']);
             $groups[$key]['lat'] = array_sum($lats) / count($lats);
@@ -199,6 +199,17 @@ class EconomicMapService
         }
 
         return ['level' => 'Low', 'color' => '#ffc107'];
+    }
+
+    protected function riskLevel(float $ratio): array
+    {
+        foreach (config('economic-map.risk_bands', []) as $band) {
+            if ($ratio >= (float) $band['min']) {
+                return ['level' => $band['label'], 'color' => $band['color']];
+            }
+        }
+
+        return ['level' => 'Low', 'color' => '#28a745'];
     }
 
     // ── Hotspot ───────────────────────────────────────────────────
@@ -292,6 +303,90 @@ class EconomicMapService
             'total' => $total,
             'sectors' => $sectors,
             'barangays' => $barangays,
+        ];
+    }
+
+    // ── Risk ──────────────────────────────────────────────────────
+
+    /**
+     * Per-barangay economic risk from LIVE data only: business exposure ×
+     * recorded damage. No hazard ratings anywhere — those were static
+     * LGU guesses and this module ships none. Damage merges by normalized
+     * barangay name so variant spellings accumulate instead of splitting.
+     */
+    public function risk(?int $calamityId = null): array
+    {
+        $groups = $this->groupByBarangay();
+        $damage = $this->calamities->damageByBarangay($calamityId);
+
+        $mergedDamage = [];
+
+        foreach ($damage['by_barangay'] as $rawName => $entry) {
+            $key = static::normalizePlace($rawName);
+
+            if ($key === '') {
+                continue;
+            }
+
+            $mergedDamage[$key] ??= ['damage' => 0.0, 'affected' => 0, 'incidents' => 0];
+            $mergedDamage[$key]['damage'] += (float) $entry['damage'];
+            $mergedDamage[$key]['affected'] += (int) $entry['affected'];
+            $mergedDamage[$key]['incidents'] += (int) $entry['incidents'];
+        }
+
+        $maxCount = 1;
+        $maxDamage = 0.0;
+
+        foreach ($groups as $key => $group) {
+            $maxCount = max($maxCount, count($group['rows']));
+            $maxDamage = max($maxDamage, (float) ($mergedDamage[$key]['damage'] ?? 0.0));
+        }
+
+        $barangays = [];
+        $levels = ['Critical' => 0, 'High' => 0, 'Moderate' => 0, 'Low' => 0];
+
+        foreach ($groups as $key => $group) {
+            $count = count($group['rows']);
+            $exposure = $count / $maxCount;
+            $entry = $mergedDamage[$key] ?? ['damage' => 0.0, 'affected' => 0, 'incidents' => 0];
+            $damageFactor = $maxDamage > 0 ? 1 + ($entry['damage'] / $maxDamage) : 1.0;
+
+            $barangays[$key] = [
+                'barangay' => $group['barangay'],
+                'lat' => $group['lat'],
+                'lng' => $group['lng'],
+                'business_count' => $count,
+                'exposure' => round($exposure, 4),
+                'affected_count' => $entry['affected'],
+                'total_damage' => round($entry['damage'], 2),
+                'raw' => $exposure * $damageFactor,
+            ];
+        }
+
+        $maxRaw = 0.0;
+
+        foreach ($barangays as $entry) {
+            $maxRaw = max($maxRaw, $entry['raw']);
+        }
+
+        foreach ($barangays as $key => $entry) {
+            $score = $maxRaw > 0 ? $entry['raw'] / $maxRaw : 0.0;
+            $barangays[$key]['score'] = round($score, 4);
+            $barangays[$key] += $this->riskLevel($score);
+            $levels[$barangays[$key]['level']]++;
+        }
+
+        $ranked = array_values($barangays);
+        usort($ranked, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
+
+        return [
+            'barangays' => $ranked,
+            'levels' => $levels,
+            'assessed' => count($ranked),
+            'calamity_id' => $calamityId,
+            'total_damage' => $damage['total_damage'],
+            'total_affected' => $damage['total_affected'],
+            'calamities' => $this->calamities->calamities(),
         ];
     }
 
