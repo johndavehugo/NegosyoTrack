@@ -59,6 +59,12 @@ Seventeen-sector breakdown with a filterable sector list, legend, totals, and a 
 
 ![Distribution map](public/images/readme/distribution_map.png)
 
+### Economic Opportunity Map
+
+Investment and development guidance per barangay — commercial density, new-registration growth, sector diversity, agriculture share, and livelihood gaps scored transparently, with a "where to invest & support" highlights board and live population data.
+
+![Opportunity map](public/images/readme/opportunity.png)
+
 ### Location Workbench
 
 Every address missing coordinates, in one table — drop a pin on the mini-map or type coordinates to locate records, with changes reflected on the maps immediately.
