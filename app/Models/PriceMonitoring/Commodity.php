@@ -12,4 +12,10 @@ class Commodity extends Model
     {
         return $this->belongsTo(Category::class);
     }
+
+    public function priceLogs()
+    {
+        return $this->hasMany(PriceLog::class)
+            ->orderBy('monitored_at');
+    }
 }
