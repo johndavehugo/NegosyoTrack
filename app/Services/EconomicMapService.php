@@ -649,6 +649,262 @@ class EconomicMapService
         return count($this->unsetLocations());
     }
 
+    // ── Opportunity ──────────────────────────────────────────────
+
+    /**
+     * Fetch and cache barangay population for a city identified by PSGC.
+     * Returns a normalized-key → int map so it can be joined with groupByBarangay().
+     * Population strings from the API carry commas and spaces (" 2,189 ") —
+     * those are stripped before casting.
+     */
+    protected function barangayPopulations(): array
+    {
+        $cacheKey = config('economic-map.cache_prefix', 'economic_map').'.barangay_populations';
+        $ttl      = $this->ttl();
+
+        return Cache::remember($cacheKey, $ttl, function (): array {
+            try {
+                $api = app(AddressApiService::class);
+
+                // Walk the business list to find the first city we can resolve to
+                // a PSGC ID — same pattern used by locationOptions().
+                foreach ($this->businessList() as $row) {
+                    if (! is_array($row)) {
+                        continue;
+                    }
+
+                    $juridical  = $row['juridical'] ?? [];
+                    $resolved   = $api->resolveAddress(
+                        $juridical['region']   ?? null,
+                        $juridical['province'] ?? null,
+                        $juridical['city']     ?? null,
+                        null,
+                    );
+
+                    $cityPsgcId = is_array($resolved['city'] ?? null)
+                        ? ($resolved['city']['psgc_id'] ?? null)
+                        : null;
+
+                    if (! filled($cityPsgcId)) {
+                        continue;
+                    }
+
+                    $barangays = $api->getBarangays($cityPsgcId);
+
+                    if (empty($barangays)) {
+                        continue;
+                    }
+
+                    $map = [];
+
+                    foreach ($barangays as $b) {
+                        $name = trim((string) ($b['name'] ?? ''));
+
+                        if ($name === '') {
+                            continue;
+                        }
+
+                        // Strip commas/spaces: " 2,189 " → 2189
+                        $pop = (int) preg_replace('/[^\d]/', '', (string) ($b['population'] ?? '0'));
+                        $map[static::normalizePlace($name)] = $pop;
+                    }
+
+                    return $map;
+                }
+            } catch (\Throwable) {
+                // Fall through — return empty map; scoring skips population factor.
+            }
+
+            return [];
+        });
+    }
+
+    protected function opportunityLevel(float $score): array
+    {
+        foreach (config('economic-map.opportunity_bands', []) as $band) {
+            if ($score >= (float) $band['min']) {
+                return ['level' => $band['label'], 'color' => $band['color']];
+            }
+        }
+
+        return ['level' => 'Low', 'color' => '#6b7280'];
+    }
+
+    /**
+     * Per-barangay economic opportunity scores.
+     *
+     * Composite score (0–1) blends five signals:
+     *   1. Commercial density   — businesses per 1 000 residents (or per-max if no population)
+     *   2. Growth momentum      — share of new registrations vs barangay total
+     *   3. Sector diversity     — normalised Shannon entropy of industry sectors
+     *   4. Agriculture signal   — share of Agriculture/Fishing rows (higher = more ag. potential)
+     *   5. Livelihood gap       — inverse commercial density (high pop, few businesses → gap)
+     *
+     * Each signal is normalised 0–1 relative to all assessed barangays, then
+     * averaged with equal weights.  Highlights (best commercial, fastest growing,
+     * etc.) are derived from the raw per-signal values before normalisation.
+     */
+    public function opportunities(): array
+    {
+        $groups     = $this->groupByBarangay();
+        $populations = $this->barangayPopulations();
+
+        if (empty($groups)) {
+            return [
+                'ranked'             => [],
+                'barangay_count'     => 0,
+                'high_very_high'     => 0,
+                'highlights'         => [],
+                'how_calculated'     => $this->opportunityHowCalculated(),
+            ];
+        }
+
+        // ── Raw signal collection ───────────────────────────────
+
+        $raw = [];
+
+        foreach ($groups as $key => $group) {
+            $count   = count($group['rows']);
+            $pop     = $populations[$key] ?? 0;
+            $newRows = count(array_filter($group['rows'], fn (array $r): bool => static::isNew($r)));
+
+            // Sector breakdown
+            $sectorCounts = [];
+
+            foreach ($group['rows'] as $row) {
+                $sector = $this->categorizeIndustry($row['juridical']['line_of_industry'] ?? null);
+                $sectorCounts[$sector] = ($sectorCounts[$sector] ?? 0) + 1;
+            }
+
+            // Shannon entropy for diversity (0 = single sector, higher = more diverse)
+            $entropy = 0.0;
+
+            foreach ($sectorCounts as $sc) {
+                $p        = $sc / $count;
+                $entropy -= $p * log($p);
+            }
+
+            // Agriculture + Fishing share
+            $agCount = ($sectorCounts['AGRICULTURE'] ?? 0) + ($sectorCounts['FISHING'] ?? 0);
+
+            // Commercial density: businesses per 1 000 pop (0 when no population data)
+            $density = $pop > 0 ? ($count / $pop) * 1000 : 0.0;
+
+            // Livelihood gap: high pop + few businesses → high gap
+            // Expressed as pop per business (more = bigger gap); 0 when no pop data
+            $gap = ($pop > 0 && $count > 0) ? $pop / $count : 0.0;
+
+            $raw[$key] = [
+                'barangay'     => $group['barangay'],
+                'lat'          => $group['lat'],
+                'lng'          => $group['lng'],
+                'count'        => $count,
+                'new'          => $newRows,
+                'population'   => $pop,
+                'density'      => $density,
+                'growth'       => $count > 0 ? $newRows / $count : 0.0,
+                'entropy'      => $entropy,
+                'ag_share'     => $count > 0 ? $agCount / $count : 0.0,
+                'gap'          => $gap,
+                'sector_counts' => $sectorCounts,
+            ];
+        }
+
+        // ── Normalise each signal 0–1 across all barangays ─────
+
+        $maxDensity = max(array_column($raw, 'density') ?: [1.0]);
+        $maxGrowth  = max(array_column($raw, 'growth')  ?: [1.0]);
+        $maxEntropy = max(array_column($raw, 'entropy') ?: [1.0]);
+        $maxAgShare = max(array_column($raw, 'ag_share') ?: [1.0]);
+        $maxGap     = max(array_column($raw, 'gap')     ?: [1.0]);
+
+        $scored = [];
+
+        foreach ($raw as $key => $r) {
+            $nDensity = $maxDensity > 0 ? $r['density']  / $maxDensity : 0.0;
+            $nGrowth  = $maxGrowth  > 0 ? $r['growth']   / $maxGrowth  : 0.0;
+            $nEntropy = $maxEntropy > 0 ? $r['entropy']  / $maxEntropy : 0.0;
+            $nAgShare = $maxAgShare > 0 ? $r['ag_share'] / $maxAgShare : 0.0;
+            $nGap     = $maxGap     > 0 ? $r['gap']      / $maxGap     : 0.0;
+
+            $score = ($nDensity + $nGrowth + $nEntropy + $nAgShare + $nGap) / 5.0;
+
+            $scored[$key] = array_merge($r, [
+                'score'       => round($score, 4),
+                'n_density'   => round($nDensity, 4),
+                'n_growth'    => round($nGrowth, 4),
+                'n_ag'        => round($nAgShare, 4),
+                'n_gap'       => round($nGap, 4),
+            ]);
+        }
+
+        // ── Attach level/color and rank ─────────────────────────
+
+        $ranked = [];
+        $highVeryHigh = 0;
+
+        foreach ($scored as $r) {
+            $level = $this->opportunityLevel($r['score']);
+            $entry = array_merge($r, $level);
+            $ranked[] = $entry;
+
+            if (in_array($level['level'], ['High', 'Very High'], true)) {
+                $highVeryHigh++;
+            }
+        }
+
+        usort($ranked, fn (array $a, array $b): int => $b['score'] <=> $a['score']);
+
+        // ── Highlights ──────────────────────────────────────────
+
+        // Best commercial area: highest business density
+        usort($scored, fn (array $a, array $b): int => $b['density'] <=> $a['density']);
+        $bestCommercial = reset($scored)['barangay'] ?? '—';
+
+        // Fastest growing: highest new-registration ratio
+        usort($scored, fn (array $a, array $b): int => $b['growth'] <=> $a['growth']);
+        $fastestGrowing = reset($scored)['barangay'] ?? '—';
+
+        // Highest tourism potential: coastal/island — approximate via "SAN JUAN" or
+        // first barangay with sector diversity (entropy) as proxy when no tourism data
+        usort($scored, fn (array $a, array $b): int => $b['entropy'] <=> $a['entropy']);
+        $highestTourism = reset($scored)['barangay'] ?? '—';
+
+        // Highest agriculture potential: highest ag_share
+        usort($scored, fn (array $a, array $b): int => $b['ag_share'] <=> $a['ag_share']);
+        $highestAg = reset($scored)['barangay'] ?? '—';
+
+        // Biggest livelihood gap: highest pop-per-business ratio
+        usort($scored, fn (array $a, array $b): int => $b['gap'] <=> $a['gap']);
+        $biggestGap = reset($scored)['barangay'] ?? '—';
+
+        return [
+            'ranked'         => $ranked,
+            'barangay_count' => count($ranked),
+            'high_very_high' => $highVeryHigh,
+            'highlights'     => [
+                ['icon' => '🏪', 'label' => 'Best commercial area',      'value' => $bestCommercial],
+                ['icon' => '📈', 'label' => 'Fastest growing area',       'value' => $fastestGrowing],
+                ['icon' => '🏝',  'label' => 'Highest tourism potential', 'value' => $highestTourism],
+                ['icon' => '🌾', 'label' => 'Highest agriculture potential', 'value' => $highestAg],
+                ['icon' => '🧑‍🤝‍🧑', 'label' => 'Biggest livelihood gap',  'value' => $biggestGap],
+            ],
+            'how_calculated' => $this->opportunityHowCalculated(),
+        ];
+    }
+
+    protected function opportunityHowCalculated(): array
+    {
+        return [
+            ['term' => 'Commercial Potential', 'detail' => 'MSME Concentration (SCIMS registry)'],
+            ['term' => 'Growth Momentum',      'detail' => 'New Registrations'],
+            ['term' => 'Tourism Potential',    'detail' => 'Sector Diversity (entropy proxy)'],
+            ['term' => 'Agriculture Potential','detail' => 'Land & Production Capacity (Agri/Fishing share)'],
+            ['term' => 'Livelihood Gap',        'detail' => 'High Population, Few Businesses'],
+            ['term' => 'Population',            'detail' => 'Live from vamosmobile.app/api/addresses/barangay/'],
+        ];
+    }
+
     // ── Select options + viewport ───────────────────────────────
 
     /**

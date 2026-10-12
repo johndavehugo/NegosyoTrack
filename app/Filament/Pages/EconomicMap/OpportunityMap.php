@@ -15,7 +15,19 @@ class OpportunityMap extends BaseMapPage
 
     protected string $view = 'filament.pages.economic-map.pages.opportunity-map';
 
-    public int $geocodedCount = 0;
+    public array $ranked = [];
+
+    public int $barangayCount = 0;
+
+    public int $highVeryHigh = 0;
+
+    public array $highlights = [];
+
+    public array $howCalculated = [];
+
+    public ?array $bounds = null;
+
+    public bool $hasData = false;
 
     public function getHeading(): string
     {
@@ -24,7 +36,7 @@ class OpportunityMap extends BaseMapPage
 
     public function getSubheading(): ?string
     {
-        return 'MSME-based Economic Activity — San Carlos City Negosyo Center';
+        return 'Investment & Development Guidance — San Carlos City Negosyo Center';
     }
 
     public function mount(): void
@@ -34,7 +46,17 @@ class OpportunityMap extends BaseMapPage
 
     protected function loadData(): void
     {
-        $this->geocodedCount = count(app(EconomicMapService::class)->geocodedRows());
+        $service = app(EconomicMapService::class);
+        $data    = $service->opportunities();
+
+        $this->ranked         = $data['ranked'];
+        $this->barangayCount  = $data['barangay_count'];
+        $this->highVeryHigh   = $data['high_very_high'];
+        $this->highlights     = $data['highlights'];
+        $this->howCalculated  = $data['how_calculated'];
+        $this->bounds         = $service->bounds();
+        $this->hasData        = count($this->ranked) > 0;
+
         $this->loadUnsetCount();
     }
 }
