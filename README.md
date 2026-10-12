@@ -23,6 +23,12 @@ Built on top of the registry is the Economic Map module — interactive MapLibre
 
 ## Features
 
+### Command Dashboard
+
+At-a-glance KPIs on login — registered and active MSMEs, calamity events with affected-business counts, total recorded damages, monitored commodities, and geocoded coverage — above monthly registration/renewal, category-breakdown, and industry-distribution charts.
+
+![Dashboard](public/images/readme/dashboard.png)
+
 ### MSME Registry
 
 Businesses, employers, and addresses with full list, view, create, and edit flows — search, filters, category badges, and status management included.
@@ -135,20 +141,14 @@ app/
     ├── AddressApiService.php     # Philippine address reference data
     ├── AddressManager.php        # Cascading dropdown orchestration
     ├── EconomicMapService.php    # Map aggregates (hotspot, distribution, search)
-    ├── EconomicMap/CalamityFeed.php  # Damage history feed
-    └── Industries.php            # Canonical 17-sector list
+    └── EconomicMap/CalamityFeed.php  # Damage history feed
+├── Enums/
+│   └── Industries.php            # Canonical 17-sector list
 config/
 └── economic-map.php              # Map bands, sector colors, cache TTL
 routes/
 └── api.php                       # API endpoint definitions
 ```
-
-## Roadmap
-
-- [ ] Risk + Opportunity tabs live (hazard ratings, tourism/agriculture/population sources)
-- [ ] Price-pressure map layer once price monitoring matures
-- [ ] Barangay boundary overlays from LGU GIS shapefiles
-- [ ] Calamity + price module get-APIs feeding the map service directly
 
 ## License
 
