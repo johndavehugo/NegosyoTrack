@@ -18,13 +18,13 @@ class PriceListOverview extends StatsOverviewWidget
                 ->descriptionIcon(Heroicon::ArchiveBox)
                 ->color(Color::Blue),
 
-            Stat::make('', CommodityVariant::where('is_active', 1)->count())
-                ->description('Active Items')
+            Stat::make('', CommodityVariant::whereNotNull('prevailing_price')->count())
+                ->description('Has Prevailing Price')
                 ->descriptionIcon(Heroicon::CheckBadge)
                 ->color(Color::Green),
 
-            Stat::make('', CommodityVariant::where('is_active', 0)->count())
-                ->description('Inactive Items')
+            Stat::make('', CommodityVariant::whereNull('prevailing_price')->count())
+                ->description('Missing Prevailing Price')
                 ->descriptionIcon(Heroicon::XCircle)
                 ->color(Color::Red),
         ];

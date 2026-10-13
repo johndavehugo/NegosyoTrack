@@ -5,13 +5,9 @@ namespace App\Filament\Resources\PriceMonitoring\PriceLists\Tables;
 use App\Models\PriceMonitoring\Agency;
 use App\Models\PriceMonitoring\Category;
 use App\Models\PriceMonitoring\CommodityVariant;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Support\Colors\Color;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -41,12 +37,15 @@ class PriceListsTable
                 TextColumn::make('commodity.category.agency.name')
                     ->sortable()
                     ->label('Agency'),
-                TextColumn::make('srp'),
-                IconColumn::make('is_active')
-                    ->boolean()
+                TextColumn::make('srp')
+                    ->label('SRP')
+                    ->numeric(decimalPlaces: 2)
+                    ->sortable(),
+                TextColumn::make('prevailing_price')
+                    ->label('Prevailing Price')
+                    ->numeric(decimalPlaces: 2)
                     ->sortable()
-                    ->label('Active')
-                    ->color(fn ($state): string => $state ? 'success' : 'danger'),
+                    ->placeholder('—'),
             ])
             ->filters([
                 SelectFilter::make('agency-filter')
@@ -84,15 +83,14 @@ class PriceListsTable
                     ->modal()
                     ->schema([
                         TextInput::make('srp')
+                            ->label('SRP')
                             ->required()
                             ->numeric()
                             ->minValue(0),
-                        Select::make('is_active')
-                            ->required()
-                            ->options([
-                                1 => 'Active',
-                                0 => 'Inactive',
-                            ]),
+                        TextInput::make('prevailing_price')
+                            ->label('Prevailing Price')
+                            ->numeric()
+                            ->minValue(0),
                     ]),
             ]);
     }

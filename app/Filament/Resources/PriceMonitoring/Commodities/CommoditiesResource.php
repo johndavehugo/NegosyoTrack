@@ -71,8 +71,12 @@ class CommoditiesResource extends Resource
                             ->numeric()
                             ->minValue(0)
                             ->required(),
+                        TextInput::make('prevailing_price')
+                            ->label('Prevailing Price')
+                            ->numeric()
+                            ->minValue(0),
                     ])
-                    ->columns(2)
+                    ->columns(3)
                     ->addActionLabel('Add another unit/size')
                     ->defaultItems(1),
             ]);
