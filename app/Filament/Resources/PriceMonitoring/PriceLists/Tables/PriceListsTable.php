@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\PriceMonitoring\PriceLists\Tables;
 
-use App\Models\PriceMonitoring\Commodity;
+use App\Models\PriceMonitoring\Agency;
+use App\Models\PriceMonitoring\Category;
+use App\Models\PriceMonitoring\CommodityVariant;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -20,20 +22,23 @@ class PriceListsTable
     {
         return $table
             ->columns([
-                TextColumn::make('product_name')
+                TextColumn::make('commodity.product_name')
+                    ->label('Product')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('category.name')
+                TextColumn::make('commodity.brand.name')
+                    ->label('Brand')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('commodity.category.name')
                     ->sortable()
                     ->label('Category')
                     ->limit(20)
-                    ->tooltip(fn (Commodity $commodity) => $commodity->category->name),
-                TextColumn::make('brand_name')
-                    ->searchable()
-                    ->sortable(),
+                    ->tooltip(fn (CommodityVariant $record) => $record->commodity->category->name ?? null),
                 TextColumn::make('unit_of_measure')
+                    ->label('Unit / Size')
                     ->sortable(),
-                TextColumn::make('category.agency.name')
+                TextColumn::make('commodity.category.agency.name')
                     ->sortable()
                     ->label('Agency'),
                 TextColumn::make('srp'),
@@ -46,11 +51,29 @@ class PriceListsTable
             ->filters([
                 SelectFilter::make('agency-filter')
                     ->label('Agency')
-                    ->relationship('category.agency', 'name')
+                    ->options(fn () => Agency::pluck('name', 'id'))
+                    ->query(function ($query, array $data) {
+                        return $query->when(
+                            $data['values'] ?? null,
+                            fn ($q, $values) => $q->whereHas(
+                                'commodity.category',
+                                fn ($q2) => $q2->whereIn('agency_id', $values)
+                            )
+                        );
+                    })
                     ->multiple(),
                 SelectFilter::make('category-filter')
                     ->label('Category')
-                    ->relationship('category', 'name')
+                    ->options(fn () => Category::pluck('name', 'id'))
+                    ->query(function ($query, array $data) {
+                        return $query->when(
+                            $data['values'] ?? null,
+                            fn ($q, $values) => $q->whereHas(
+                                'commodity',
+                                fn ($q2) => $q2->whereIn('category_id', $values)
+                            )
+                        );
+                    })
                     ->multiple(),
             ])
             ->recordUrl(null)
@@ -72,10 +95,5 @@ class PriceListsTable
                             ]),
                     ]),
             ]);
-        // ->toolbarActions([
-        //     BulkActionGroup::make([
-        //         DeleteBulkAction::make(),
-        //     ]),
-        // ]);
     }
 }
