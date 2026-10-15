@@ -29,6 +29,23 @@ class CalamitiesTable
                     ->date()
                     ->sortable(),
                 TextColumn::make('description'),
+
+                TextColumn::make('incident_count')
+                    ->label('Affected MSMEs')
+                    ->counts('incident')
+                    ->badge()
+                    ->color('warning')
+                    ->alignCenter()
+                    ->sortable(),
+
+                TextColumn::make('incident_sum_estimated_cost_of_damages')
+                    ->label('Total Damage')
+                    ->sum('incident', 'estimated_cost_of_damages')
+                    ->formatStateUsing(
+                        fn ($state): string => '₱'.number_format((float) $state, 2)
+                    )
+                    ->alignEnd()
+                    ->sortable(),
             ])
             ->filters([
                 SelectFilter::make('calamity_type')
