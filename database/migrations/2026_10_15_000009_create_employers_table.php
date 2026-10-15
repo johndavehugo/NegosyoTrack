@@ -12,6 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('employers', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
             $table->string('id', 100)->primary();
             $table->string('entity_no', 50)->unique('entity_no');
             $table->string('full_name', 200);
@@ -24,6 +26,11 @@ return new class extends Migration
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
             $table->index('address_id', 'employers_ibfk_1');
+            $table->foreign('address_id', 'employers_ibfk_1')
+                ->references('id')
+                ->on('addresses')
+                ->onUpdate('restrict')
+                ->onDelete('set null');
         });
     }
 

@@ -11,13 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('commodity_categories', function (Blueprint $table) {
+        Schema::create('calamities', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
             $table->id();
-            $table->unsignedBigInteger('agency_id');
-            $table->string('name', 100);
+            $table->string('name', 150);
+            $table->string('calamity_type', 50);
+            $table->date('declaration_date');
+            $table->text('description')->nullable();
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->nullable();
-            $table->index('agency_id', 'fk_category_agency');
         });
     }
 
@@ -26,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('commodity_categories');
+        Schema::dropIfExists('calamities');
     }
 };

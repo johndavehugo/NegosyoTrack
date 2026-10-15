@@ -12,6 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('addresses', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
             $table->string('id', 100)->primary();
             $table->string('region', 100)->nullable();
             $table->string('province', 100)->nullable();
