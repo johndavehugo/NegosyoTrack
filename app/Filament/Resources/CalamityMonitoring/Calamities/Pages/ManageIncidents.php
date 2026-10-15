@@ -3,33 +3,30 @@
 namespace App\Filament\Resources\CalamityMonitoring\Calamities\Pages;
 
 use App\Filament\Resources\CalamityMonitoring\Calamities\CalamityResource;
+use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\IncidentResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Schemas\IncidentForm;
+use App\Models\MsmeManagement\Address;
 use BackedEnum;
-use Filament\Actions\AssociateAction;
-use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\DissociateAction;
-use Filament\Actions\DissociateBulkAction;
 use Filament\Actions\EditAction;
-use Filament\Forms\Components\Repeater;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ManageRelatedRecords;
 use Filament\Schemas\Components\EmbeddedTable;
-use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Database\Eloquent\Builder;
 
 class ManageIncidents extends ManageRelatedRecords
 {
     protected static string $resource = CalamityResource::class;
 
     protected static string $relationship = 'incident';
+
+    protected static ?string $relatedResource = IncidentResource::class;
 
     protected static string|BackedEnum|null $navigationIcon =
         Heroicon::OutlinedRectangleStack;
@@ -38,53 +35,43 @@ class ManageIncidents extends ManageRelatedRecords
     {
         return $schema
             ->components([
-                Grid::make([
-                    'default' => 1,
-                    'lg' => 3,
-                ])
+                Section::make('Calamity Information')
+                    ->description('Details of the selected calamity.')
+                    ->collapsible()
+                    ->collapsed()
+                    ->persistCollapsed()
+                    ->compact()
+                    ->columns(3)
                     ->schema([
-                        Section::make('Calamity Information')
-                            ->description('Details of the selected calamity.')
-                            ->columnSpan([
-                                'default' => 1,
-                                'lg' => 1,
-                            ])
-                            ->compact()
-                            ->schema([
-                                TextEntry::make('name')
-                                    ->label('Calamity Name')
-                                    ->state(fn () => $this->getOwnerRecord()->name)
-                                    ->weight('bold')
-                                    ->placeholder('No name provided'),
+                        TextEntry::make('name')
+                            ->label('Calamity Name')
+                            ->state(fn () => $this->getOwnerRecord()->name)
+                            ->weight('bold')
+                            ->placeholder('No name provided'),
 
-                                TextEntry::make('calamity_type')
-                                    ->label('Calamity Type')
-                                    ->state(fn () => $this->getOwnerRecord()->calamity_type)
-                                    ->badge()
-                                    ->placeholder('Not specified'),
+                        TextEntry::make('calamity_type')
+                            ->label('Calamity Type')
+                            ->state(fn () => $this->getOwnerRecord()->calamity_type)
+                            ->badge()
+                            ->placeholder('Not specified'),
 
-                                TextEntry::make('declaration_date')
-                                    ->label('Declaration Date')
-                                    ->state(fn () => $this->getOwnerRecord()->declaration_date)
-                                    ->date('M d, Y')
-                                    ->placeholder('Not specified'),
+                        TextEntry::make('declaration_date')
+                            ->label('Declaration Date')
+                            ->state(fn () => $this->getOwnerRecord()->declaration_date)
+                            ->date('M d, Y')
+                            ->placeholder('Not specified'),
 
-                                TextEntry::make('description')
-                                    ->label('Description')
-                                    ->state(fn () => $this->getOwnerRecord()->description)
-                                    ->placeholder('No description provided')
-                                    ->columnSpanFull(),
-                            ]),
+                        TextEntry::make('description')
+                            ->label('Description')
+                            ->state(fn () => $this->getOwnerRecord()->description)
+                            ->placeholder('No description provided')
+                            ->columnSpanFull(),
+                    ]),
 
-                        Section::make('Incident Records')
-                            ->description('Monitor and manage incidents associated with this calamity.')
-                            ->columnSpan([
-                                'default' => 1,
-                                'lg' => 2,
-                            ])
-                            ->schema([
-                                EmbeddedTable::make(),
-                            ]),
+                Section::make('Incident Records')
+                    ->description('Monitor and manage incidents associated with this calamity.')
+                    ->schema([
+                        EmbeddedTable::make(),
                     ]),
             ]);
     }
@@ -170,36 +157,37 @@ class ManageIncidents extends ManageRelatedRecords
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                SelectFilter::make('barangay')
+                    ->label('Barangay')
+                    ->searchable()
+                    ->options(function (): array {
+                        return Address::query()
+                            ->whereHas(
+                                'juridical.incident',
+                                fn (Builder $query): Builder => $query->whereBelongsTo($this->getOwnerRecord()),
+                            )
+                            ->whereNotNull('barangay')
+                            ->where('barangay', '!=', '')
+                            ->orderBy('barangay')
+                            ->distinct()
+                            ->pluck('barangay', 'barangay')
+                            ->all();
+                    })
+                    ->query(function (Builder $query, array $data): Builder {
+                        return $query->when(
+                            filled($data['value'] ?? null),
+                            fn (Builder $query): Builder => $query->whereHas(
+                                'juridical.address',
+                                fn (Builder $query): Builder => $query->where('barangay', $data['value']),
+                            ),
+                        );
+                    }),
             ])
             ->headerActions([
                 CreateAction::make()
-                    ->label('Create Incident')
-                    ->schema([
-                        Repeater::make('incidents')
-                            ->label('Incidents')
-                            ->schema(IncidentForm::fields())
-                            ->columns(3)
-                            ->defaultItems(1)
-                            ->minItems(1)
-                            ->addActionLabel('Add Another Incident')
-                            ->reorderable(false)
-                            ->columnSpanFull(),
-                    ])
-                    ->using(function (array $data, $livewire) {
-                        return DB::transaction(function () use ($data, $livewire) {
-                            $lastIncident = null;
-
-                            foreach ($data['incidents'] as $incidentData) {
-                                $lastIncident = $livewire->getOwnerRecord()
-                                    ->incident()
-                                    ->create($incidentData);
-                            }
-
-                            return $lastIncident;
-                        });
-                    }),
+                    ->label('Create Incident'),
             ])
+            ->toolbarActions([])
             ->recordActions([
                 EditAction::make(),
             ]);
