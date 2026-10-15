@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Pages;
 
+use App\Filament\Resources\CalamityMonitoring\Calamities\CalamityResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\IncidentResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Tables\AffectedMsmeTable;
 use App\Models\MsmeManagement\Juridical;
@@ -142,5 +143,12 @@ class CreateIncident extends CreateRecord
         }
 
         return $last;
+    }
+
+    protected function getRedirectUrl(): string
+    {
+        return CalamityResource::getUrl('manage-incidents', [
+            'record' => $this->getParentRecord(),
+        ]);
     }
 }
