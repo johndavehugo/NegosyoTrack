@@ -7,7 +7,7 @@ use App\Filament\Resources\PriceMonitoring\PriceLists\Pages\EditPriceList;
 use App\Filament\Resources\PriceMonitoring\PriceLists\Pages\ListPriceLists;
 use App\Filament\Resources\PriceMonitoring\PriceLists\Schemas\PriceListForm;
 use App\Filament\Resources\PriceMonitoring\PriceLists\Tables\PriceListsTable;
-use App\Models\PriceMonitoring\Commodity;
+use App\Models\PriceMonitoring\CommodityVariant;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -16,7 +16,9 @@ use Filament\Tables\Table;
 
 class PriceListResource extends Resource
 {
-    protected static ?string $model = Commodity::class;
+    // Changed from Commodity::class — the Price List now shows one row per
+    // variant (unit/size), since each variant has its own SRP.
+    protected static ?string $model = CommodityVariant::class;
 
     protected static ?string $pluralModelLabel = 'Price Lists';
 
