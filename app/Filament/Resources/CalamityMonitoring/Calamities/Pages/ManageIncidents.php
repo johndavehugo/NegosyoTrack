@@ -5,20 +5,28 @@ namespace App\Filament\Resources\CalamityMonitoring\Calamities\Pages;
 use App\Filament\Resources\CalamityMonitoring\Calamities\CalamityResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\IncidentResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Schemas\IncidentForm;
+use App\Filament\Widgets\IncidentStatsWidget;
 use App\Models\MsmeManagement\Address;
 use BackedEnum;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
+use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Pages\ManageRelatedRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 class ManageIncidents extends ManageRelatedRecords
 {
@@ -30,6 +38,26 @@ class ManageIncidents extends ManageRelatedRecords
 
     protected static string|BackedEnum|null $navigationIcon =
         Heroicon::OutlinedRectangleStack;
+
+    /**
+     * @return array<class-string>
+     */
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            IncidentStatsWidget::class,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getWidgetData(): array
+    {
+        return [
+            'calamityId' => (string) $this->getRecord()->getKey(),
+        ];
+    }
 
     public function content(Schema $schema): Schema
     {
@@ -85,6 +113,7 @@ class ManageIncidents extends ManageRelatedRecords
     {
         return $table
             ->recordTitleAttribute('incident')
+            ->defaultSort('date_occurred', 'desc')
             ->columns([
                 TextColumn::make('juridical.name')
                     ->label('Affected MSME')
@@ -121,7 +150,8 @@ class ManageIncidents extends ManageRelatedRecords
                         fn ($state): string => '₱'.number_format((float) $state, 2)
                     )
                     ->alignEnd()
-                    ->sortable(),
+                    ->sortable()
+                    ->summarize(Sum::make()->label('Total')),
 
                 TextColumn::make('status')
                     ->label('Verification Status')
@@ -182,12 +212,65 @@ class ManageIncidents extends ManageRelatedRecords
                             ),
                         );
                     }),
+
+                SelectFilter::make('status')
+                    ->label('Verification Status')
+                    ->options([
+                        'PENDING_VERIFICATION' => 'Pending Verification',
+                        'VERIFIED' => 'Verified',
+                        'AID_RELEASED' => 'Aid Released',
+                    ]),
+
+                SelectFilter::make('nature_of_damage')
+                    ->label('Nature of Damage')
+                    ->options([
+                        'PARTIAL' => 'Partial Damage',
+                        'TOTAL' => 'Total Damage',
+                    ]),
+
+                Filter::make('date_occurred')
+                    ->label('Date Occurred')
+                    ->schema([
+                        DatePicker::make('from')->label('From'),
+                        DatePicker::make('until')->label('Until'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when(
+                            filled($data['from'] ?? null),
+                            fn (Builder $query): Builder => $query->whereDate('date_occurred', '>=', $data['from']),
+                        )
+                        ->when(
+                            filled($data['until'] ?? null),
+                            fn (Builder $query): Builder => $query->whereDate('date_occurred', '<=', $data['until']),
+                        )),
             ])
             ->headerActions([
                 CreateAction::make()
                     ->label('Create Incident'),
             ])
-            ->toolbarActions([])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('markVerified')
+                        ->label('Mark as Verified')
+                        ->icon(Heroicon::CheckCircle)
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(fn (Collection $records) => $records->each->update(['status' => 'VERIFIED']))
+                        ->successNotificationTitle('Selected incidents marked as verified.'),
+
+                    BulkAction::make('markAidReleased')
+                        ->label('Mark as Aid Released')
+                        ->icon(Heroicon::Gift)
+                        ->color('info')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(fn (Collection $records) => $records->each->update(['status' => 'AID_RELEASED']))
+                        ->successNotificationTitle('Selected incidents marked as aid released.'),
+
+                    DeleteBulkAction::make(),
+                ]),
+            ])
             ->recordActions([
                 EditAction::make(),
             ]);
