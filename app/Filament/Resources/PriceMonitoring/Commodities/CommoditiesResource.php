@@ -9,6 +9,7 @@ use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
@@ -39,13 +40,45 @@ class CommoditiesResource extends Resource
             ->components([
                 TextInput::make('product_name')
                     ->required(),
-                TextInput::make('brand_name')
-                    ->required(),
-                TextInput::make('unit_of_measure')
-                    ->required(),
+
+                Select::make('brand_id')
+                    ->label('Brand')
+                    ->relationship('brand', 'name')
+                    ->searchable()
+                    ->preload()
+                    ->createOptionForm([
+                        TextInput::make('name')->required()->unique(),
+                    ]),
+
                 Select::make('category_id')
                     ->relationship('category', 'name')
                     ->required(),
+
+                Select::make('juridical_id')
+                    ->label('Establishment')
+                    ->relationship('juridical', 'name')
+                    ->searchable()
+                    ->preload(),
+
+                Repeater::make('variants')
+                    ->relationship('variants')
+                    ->schema([
+                        TextInput::make('unit_of_measure')
+                            ->label('Unit / Size')
+                            ->required(),
+                        TextInput::make('srp')
+                            ->label('SRP')
+                            ->numeric()
+                            ->minValue(0)
+                            ->required(),
+                        TextInput::make('prevailing_price')
+                            ->label('Prevailing Price')
+                            ->numeric()
+                            ->minValue(0),
+                    ])
+                    ->columns(3)
+                    ->addActionLabel('Add another unit/size')
+                    ->defaultItems(1),
             ]);
     }
 
@@ -57,13 +90,20 @@ class CommoditiesResource extends Resource
                 TextColumn::make('product_name')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('brand_name')
+                TextColumn::make('brand.name')
+                    ->label('Brand')
                     ->searchable()
                     ->sortable(),
-                TextColumn::make('unit_of_measure'),
                 TextColumn::make('category.name')
                     ->sortable()
                     ->label('Category'),
+                TextColumn::make('juridical.name')
+                    ->label('Establishment')
+                    ->toggleable()
+                    ->sortable(),
+                TextColumn::make('variants_count')
+                    ->counts('variants')
+                    ->label('Variants'),
             ])
             ->filters([
                 //
@@ -71,13 +111,7 @@ class CommoditiesResource extends Resource
             ->recordActions([
                 EditAction::make()
                     ->color(Color::Yellow),
-                // DeleteAction::make(),
             ]);
-        // ->toolbarActions([
-        //     BulkActionGroup::make([
-        //         DeleteBulkAction::make(),
-        //     ]),
-        // ]);
     }
 
     public static function getPages(): array
