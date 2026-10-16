@@ -19,7 +19,7 @@
                     San Carlos City e-Presyo
                 </h1>
                 <p class="mt-1.5 text-sm text-slate-500 max-w-xl">
-                    Alamin ang Suggested Retail Price (SRP) at ang kasalukuyang presyo ng mga pangunahing bilihin sa San Carlos City. I-click ang anumang produkto para makita ang presyo sa iba't ibang establisyimento.
+                    Find out the Suggested Retail Price (SRP) and the current prices of basic commodities in San Carlos City. Click on any product to view its price across different establishments.
                 </p>
             </div>
 
@@ -468,50 +468,74 @@
             return;
         }
 
-        // Determine lowest price for highlighting
-        const lowestPrice = Math.min(
-            ...establishments
-                .filter(e => e.prevailing_price != null)
-                .map(e => parseFloat(e.prevailing_price))
-        );
+        const withPrice   = establishments.filter(e => e.prevailing_price != null);
+        const lowestPrice = withPrice.length
+            ? Math.min(...withPrice.map(e => parseFloat(e.prevailing_price)))
+            : null;
 
         establishments.forEach((e, idx) => {
-            const isLowest  = e.prevailing_price != null && parseFloat(e.prevailing_price) === lowestPrice && establishments.filter(x => x.prevailing_price != null).length > 1;
+            const isLowest  = lowestPrice !== null
+                && e.prevailing_price != null
+                && parseFloat(e.prevailing_price) === lowestPrice
+                && withPrice.length > 1;
             const isCurrent = e.is_current;
 
-            const row = document.createElement('div');
-            row.className = `flex items-center gap-3 p-3.5 rounded-xl border transition-all ${
-                isLowest
-                    ? 'bg-[#186b02]/5 border-[#186b02]/30'
-                    : isCurrent
-                        ? 'bg-blue-50/50 border-blue-200/60'
-                        : 'bg-white border-slate-200/80 hover:bg-slate-50'
-            }`;
+            // Status colour tokens
+            const statusColors = {
+                above:   { price: 'text-rose-600',    tag: 'bg-rose-50 text-rose-700 border-rose-200'    },
+                below:   { price: 'text-emerald-700', tag: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+                equal:   { price: 'text-[#186b02]',   tag: 'bg-[#186b02]/8 text-[#186b02] border-[#186b02]/20' },
+                no_data: { price: 'text-slate-400',   tag: 'bg-slate-50 text-slate-500 border-slate-200'  },
+            };
+            const sc = statusColors[e.status] ?? statusColors.no_data;
 
-            // Rank badge
-            const rankEl = `<span class="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
-                isLowest ? 'bg-[#186b02] text-white' : 'bg-slate-100 text-slate-500'
-            }">${idx + 1}</span>`;
+            // Wrapper background
+            const wrapClass = isLowest
+                ? 'bg-[#186b02]/5 border-[#186b02]/20'
+                : isCurrent
+                    ? 'bg-sky-50/60 border-sky-200/50'
+                    : 'bg-white border-slate-200 hover:bg-slate-50/60';
+
+            // Status label text
+            const statusLabel = {
+                above:   `↑ Above SRP`,
+                below:   `↓ Below SRP`,
+                equal:   `✓ At SRP`,
+                no_data: `No data`,
+            }[e.status] ?? 'No data';
+
+            const row = document.createElement('div');
+            row.className = `rounded-xl border transition-colors duration-150 overflow-hidden ${wrapClass}`;
 
             row.innerHTML = `
-                ${rankEl}
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <p class="font-semibold text-slate-900 text-sm leading-snug">${e.establishment}</p>
-                        ${isLowest  ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#186b02] text-white">Lowest Price</span>` : ''}
-                        ${isCurrent ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700">Viewing</span>` : ''}
+                <div class="p-4">
+                    <!-- Header row: rank · name · status tag -->
+                    <div class="flex items-center gap-3">
+                        <span class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold
+                            ${isLowest ? 'bg-[#186b02] text-white' : 'bg-slate-100 text-slate-500'}">${idx + 1}</span>
+
+                        <p class="flex-1 font-semibold text-slate-900 text-sm leading-snug truncate">${e.establishment}</p>
+
+                        <span class="shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${sc.tag}">${statusLabel}</span>
                     </div>
-                    ${e.address ? `<p class="text-xs text-slate-400 mt-0.5 truncate">${e.address}</p>` : ''}
-                    ${e.contact_no ? `<p class="text-xs text-slate-400">${e.contact_no}</p>` : ''}
-                </div>
-                <div class="text-right shrink-0">
-                    <p class="text-lg font-bold ${e.status === 'above' ? 'text-rose-600' : e.status === 'below' ? 'text-emerald-700' : e.status === 'equal' ? 'text-[#186b02]' : 'text-slate-400'}">
-                        ${fmt(e.prevailing_price)}
-                    </p>
-                    <div class="flex items-center justify-end gap-1 mt-0.5">
-                        <span class="text-xs text-slate-400">SRP ${fmt(e.srp)}</span>
+
+                    ${e.address ? `<p class="mt-1.5 ml-9 text-xs text-slate-400 truncate">${e.address}</p>` : ''}
+
+                    <!-- Price cells -->
+                    <div class="mt-3 ml-9 grid grid-cols-2 gap-2">
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5">
+                            <p class="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Suggested Retail Price (SRP)</p>
+                            <p class="text-base font-bold text-slate-700">${fmt(e.srp)}</p>
+                        </div>
+                        <div class="rounded-lg px-3 py-2.5 border
+                            ${e.status === 'above' ? 'bg-rose-50 border-rose-200'
+                            : e.status === 'below' ? 'bg-emerald-50 border-emerald-200'
+                            : e.status === 'equal' ? 'bg-[#186b02]/5 border-[#186b02]/20'
+                            : 'bg-slate-50 border-slate-200'}">
+                            <p class="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">Prevailing Price</p>
+                            <p class="text-base font-bold ${sc.price}">${fmt(e.prevailing_price)}</p>
+                        </div>
                     </div>
-                    <div class="mt-1">${statusBadge(e.status, e.diff)}</div>
                 </div>`;
 
             modalEstabs.appendChild(row);
