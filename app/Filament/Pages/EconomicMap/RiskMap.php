@@ -31,9 +31,6 @@ class RiskMap extends BaseMapPage
 
     public ?array $bounds = null;
 
-    /** Raw MSME coordinates for the heat layer — pure concentration, no banding. */
-    public array $heatPoints = [];
-
     public bool $hasData = false;
 
     public function getHeading(): string
@@ -62,7 +59,6 @@ class RiskMap extends BaseMapPage
         $this->totalDamage = $risk['total_damage'];
         $this->totalAffected = $risk['total_affected'];
         $this->calamities = $risk['calamities'];
-        $this->heatPoints = $service->heatPoints();
         $this->bounds = $service->bounds();
         $this->hasData = $this->assessed > 0;
         $this->loadUnsetCount();

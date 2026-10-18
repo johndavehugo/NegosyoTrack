@@ -78,10 +78,10 @@
                 <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
                     <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Reading the map</p>
                     <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat blur</span> — where MSMEs physically cluster, straight from registry coordinates</li>
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Marker dot</span> — the barangay's risk band, from exposure × historical damage</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat blur</span> — risk intensity: blue is least risk-prone, red is most risk-prone</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Marker dot</span> — the barangay's exact risk band, from exposure × historical damage</li>
                     </ul>
-                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">The blur is concentration only. Read risk from the dots and the sidebar counts.</p>
+                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Click a dot for the full exposure and damage breakdown behind its score.</p>
                 </div>
 
                 @include('filament.pages.economic-map.partials.summary-card')
@@ -91,17 +91,17 @@
             <div class="col-span-12 md:col-span-8 md:flex md:flex-col lg:col-span-9">
                 <div class="overflow-hidden rounded-lg shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
                     <div class="flex h-10 shrink-0 items-center gap-2 bg-[#1e2a78] px-4">
-                        <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🛡 Economic Risk Map — MSME Density Heat Layer</p>
+                        <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🛡 Economic Risk Map — Risk Heat Layer</p>
                         <span class="shrink-0 rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-[#1e2a78]">₱{{ number_format($totalDamage, 2) }} recorded</span>
                     </div>
                     <div class="relative md:min-h-0 md:flex-1">
                         <div id="risk-map" wire:ignore class="h-[60vh] w-full md:h-full"></div>
                         <div class="absolute bottom-10 right-3 rounded-lg bg-white/95 p-3 text-xs shadow-lg dark:bg-gray-900/95">
-                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">MSME Density</p>
+                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Intensity</p>
                             <div class="h-2 w-36 rounded-full" style="background: {{ $heatGradient }};"></div>
                             <div class="mt-0.5 flex justify-between text-[10px] text-gray-400">
-                                <span>Sparse</span>
-                                <span>Dense</span>
+                                <span>Least risk-prone</span>
+                                <span>Risk-prone</span>
                             </div>
                             <p class="mb-1.5 mt-2.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Level</p>
                             @foreach (config('economic-map.risk_bands', []) as $band)
@@ -118,14 +118,13 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Heat blur shows where MSMEs cluster. Dot colour shows risk — Critical, High, Moderate, Low. Click a dot for the full risk breakdown.',
+        'slot' => 'Heat blur shows risk intensity — red areas are risk-prone, blue areas are least risk-prone. Dot colour is the exact risk band; click a dot for the full breakdown.',
     ])
 
     <script type="module">
         import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
 
         const barangays = @js($barangays);
-        const heatPoints = @js($heatPoints);
         const bounds = @js($bounds);
         const basemap = @js(config('economic-map.basemap'));
         const heatRamp = @js(config('economic-map.heat_ramp'));
@@ -137,12 +136,16 @@
 
         const money = (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+        // One point per barangay centroid, weighted by its normalized risk
+        // score, so the heat blur reads as risk intensity instead of raw
+        // MSME density. The 0.2 floor keeps least-risk barangays visibly
+        // blue rather than fading to nothing.
         const heatFeatures = () => ({
             type: 'FeatureCollection',
-            features: heatPoints.map(([lat, lng]) => ({
+            features: barangays.map((b) => ({
                 type: 'Feature',
-                properties: {},
-                geometry: { type: 'Point', coordinates: [lng, lat] },
+                properties: { weight: 0.2 + 0.8 * (b.score ?? 0) },
+                geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
             })),
         });
 
@@ -193,10 +196,12 @@
                 map.addLayer({
                     id: 'heat', type: 'heatmap', source: 'heat', maxzoom: 17,
                     paint: {
-                        // Blur = business concentration only. Band colouring lives on
-                        // the center markers, so these two never share a scale.
-                        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 14, 12, 26, 14, 42, 16, 60],
-                        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 13, 1.3, 16, 2.2],
+                        // Points carry their barangay's risk score as weight, so
+                        // blob colour reads as risk intensity: blue = least
+                        // risk-prone, red = most. Exact bands stay on the dots.
+                        'heatmap-weight': ['get', 'weight'],
+                        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 18, 12, 30, 14, 46, 16, 64],
+                        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.5, 13, 0.9, 16, 1.4],
                         'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.95, 14, 0.55, 17, 0.25],
                         'heatmap-color': heatColor,
                     },

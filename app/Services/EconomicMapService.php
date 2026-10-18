@@ -42,9 +42,6 @@ class EconomicMapService
 
     public const DEFAULT_SECTOR = 'OTHER COMMUNITY, SOCIAL AND PERSONAL SERVICE ACTIVITIES';
 
-    /** Ceiling on points handed to the risk map heat layer (Livewire payload). */
-    public const HEAT_POINT_LIMIT = 5000;
-
     public function __construct(protected CalamityFeed $calamities) {}
 
     // ── Source ────────────────────────────────────────────────────
@@ -391,31 +388,6 @@ class EconomicMapService
             'total_affected' => $damage['total_affected'],
             'calamities' => $this->calamities->calamities(),
         ];
-    }
-
-    /**
-     * [lat, lng] pairs for the risk map's heat layer — one point per geocoded
-     * MSME at unit weight, so the blur follows real business clustering instead
-     * of ringing averaged barangay centroids. Pure concentration, so it carries
-     * no risk information: bands and marker colours come from risk() and the two
-     * channels must stay separate.
-     */
-    public function heatPoints(?array $rows = null): array
-    {
-        $points = [];
-
-        foreach ($this->geocodedRows($rows) as $row) {
-            if (count($points) >= static::HEAT_POINT_LIMIT) {
-                break;
-            }
-
-            $points[] = [
-                (float) $row['juridical']['latitude'],
-                (float) $row['juridical']['longitude'],
-            ];
-        }
-
-        return $points;
     }
 
     // ── Pins ────────────────────────────────────────────────────

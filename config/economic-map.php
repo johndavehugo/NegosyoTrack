@@ -46,12 +46,11 @@ return [
         ['label' => 'Low', 'color' => '#28a745', 'min' => 0.00],
     ],
 
-    // Density ramp for the risk map's heat layer: MapLibre 'heatmap-density'
-    // (kernel weight, not risk) -> colour. Sequential and deliberately distinct
-    // from risk_bands, so blob colour never reads as a risk level — the small
-    // marker dots carry risk_bands, the blobs carry this. Single source for the
-    // heatmap-color expression and the legend gradient, so they cannot drift.
-    // Stops must stay ascending on [0..1].
+    // Risk-intensity ramp for the risk map's heat layer: MapLibre
+    // 'heatmap-density' over barangay points weighted by their risk score ->
+    // colour. Blue = least risk-prone, red = most risk-prone. Single source for
+    // the heatmap-color expression and the legend gradient, so they cannot
+    // drift. Stops must stay ascending on [0..1].
     'heat_ramp' => [
         ['stop' => 0.00, 'color' => 'rgba(30, 64, 175, 0)'],
         ['stop' => 0.10, 'color' => '#1d4ed8'],
