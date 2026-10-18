@@ -8,4 +8,9 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateCalamity extends CreateRecord
 {
     protected static string $resource = CalamityResource::class;
+
+    protected function getRedirectUrl(): string
+    {
+        return CalamityResource::getUrl('index');
+    }
 }

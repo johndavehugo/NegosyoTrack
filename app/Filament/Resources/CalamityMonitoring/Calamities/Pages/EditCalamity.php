@@ -16,4 +16,9 @@ class EditCalamity extends EditRecord
             DeleteAction::make(),
         ];
     }
+
+    protected function getRedirectUrl(): string
+    {
+        return CalamityResource::getUrl('index');
+    }
 }
