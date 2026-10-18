@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Filament\Resources\MsmeManagement\Juridicals\JuridicalResource;
 use App\Http\Controllers\Controller;
+use App\Http\Resources\MsmeResource;
 use App\Models\MsmeManagement\Address;
 use App\Models\MsmeManagement\Employer;
 use App\Models\MsmeManagement\Juridical;
@@ -13,76 +15,12 @@ use Str;
 
 class MsmeController extends Controller
 {
-    public function index(Request $request): JsonResponse
-    {
+    public function index(){
+        return MsmeResource::collection(Juridical::all());
+    }
 
-        $query = Juridical::with(['address', 'employer.address']);
-
-        $search = $request->query('search');
-        if ($search) {
-            $query->where('name', 'like', "%$search%");
-        }
-
-        $rows = $query->get();
-
-        $total = $rows->count();
-
-        $businesses = $rows->map(function ($row) {
-            return [
-                'juridical' => [
-                    'id' => $row->id,
-                    'entity_no' => $row->entity_no,
-                    'name' => $row->name,
-                    'date_reg' => $row->date_reg,
-                    'registration_type' => $row->registration_type,
-                    'bus_status' => $row->bus_status,
-                    'capitalization' => $row->capitalization,
-                    'category' => $row->category,
-                    'contact_no' => $row->contact_no,
-                    'contact_email' => $row->contact_email,
-                    'line_of_industry' => $row->line_of_industry,
-                    'address_id' => $row->address?->id,
-                    'region' => $row->address?->region,
-                    'province' => $row->address?->province,
-                    'city' => $row->address?->city,
-                    'barangay' => $row->address?->barangay,
-                    'subdivision' => $row->address?->subdivision,
-                    'street' => $row->address?->street,
-                    'upblb_num' => $row->address?->upblb_num,
-                    'zip' => $row->address?->zip,
-                    'longitude' => $row->address?->longitude,
-                    'latitude' => $row->address?->latitude,
-                ],
-                'employer' => [
-                    'employer_id' => $row->employer?->id,
-                    'entity_no' => $row->employer?->entity_no,
-                    'full_name' => $row->employer?->full_name,
-                    'gender' => $row->employer?->gender,
-                    'birth_date' => $row->employer?->birth_date,
-                    'contact_no' => $row->employer?->contact_no,
-                    'email' => $row->employer?->email,
-                    'special_category' => $row?->employer?->special_category,
-                    'address_id' => $row->employer?->address->id,
-                    'region' => $row->employer?->address->region,
-                    'province' => $row->employer?->address->province,
-                    'city' => $row->employer?->address->city,
-                    'barangay' => $row->employer?->address->barangay,
-                    'subdivision' => $row->employer?->address->subdivision,
-                    'street' => $row->employer?->address->street,
-                    'upblb_num' => $row->employer?->address->upblb_num,
-                    'zip' => $row->employer?->address->zip,
-                    'longitude' => $row->employer?->address->longitude,
-                    'latitude' => $row->employer?->address->latitude,
-                ],
-            ];
-        });
-
-        return response()->json([
-            'status' => 'success',
-            'type' => 'business_list',
-            'total' => $total,
-            'data' => $businesses,
-        ]);
+    public function show(Juridical $juridical) {
+        return new MsmeResource($juridical);
     }
 
     public function store(Request $request): JsonResponse

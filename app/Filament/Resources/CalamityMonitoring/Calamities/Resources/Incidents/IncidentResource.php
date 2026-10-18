@@ -22,11 +22,11 @@ class IncidentResource extends Resource
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedRectangleStack;
 
     public static function getParentResourceRegistration(): ?ParentResourceRegistration
-{
+    {
         return CalamityResource::asParent()
             ->relationship('incident')
             ->inverseRelationship('calamity')
-            ->page('manage-incidents'); 
+            ->page('manage-incidents');
     }
 
     protected static ?string $recordTitleAttribute = 'incident';

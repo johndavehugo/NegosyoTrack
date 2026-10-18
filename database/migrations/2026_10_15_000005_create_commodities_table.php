@@ -12,17 +12,18 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('commodities', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
             $table->id();
             $table->unsignedBigInteger('category_id');
+            $table->unsignedBigInteger('brand_id')->nullable();
+            $table->string('juridical_id', 100)->nullable();
             $table->string('product_name', 150);
-            $table->string('brand_name', 100)->nullable();
-            $table->string('unit_of_measure', 50)->default('1 kg');
-            $table->decimal('srp', 10, 2)->nullable();
-            $table->string('establishments', 100)->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamp('created_at')->useCurrent();
             $table->timestamp('updated_at')->useCurrent()->useCurrentOnUpdate();
             $table->index('category_id', 'fk_commodity_category');
+            $table->index('brand_id', 'commodities_brand_id_foreign');
         });
     }
 

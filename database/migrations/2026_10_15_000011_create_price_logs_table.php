@@ -12,6 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('price_logs', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
             $table->id();
             $table->unsignedBigInteger('commodity_id');
             $table->decimal('prevailing_price', 10, 2);

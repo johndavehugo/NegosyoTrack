@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 
 // Msme shits
 Route::get('/msme', MsmeController::class.'@index');
+Route::get('/msme/{juridical:entity_no}', MsmeController::class.'@show');
 Route::post('msme', MsmeController::class.'@store')->name('msme.store');
 Route::put('/msme/employer/{employer:entity_no}', MsmeController::class.'@updateEmployer')->name('msme.employer.update');
 Route::put('/msme/juridical/{juridical:entity_no}', MsmeController::class.'@updateJuridical')->name('msme.juridical.update');

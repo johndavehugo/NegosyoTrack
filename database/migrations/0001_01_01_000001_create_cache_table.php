@@ -14,13 +14,15 @@ return new class extends Migration
         Schema::create('cache', function (Blueprint $table) {
             $table->string('key')->primary();
             $table->mediumText('value');
-            $table->bigInteger('expiration')->index();
+            $table->bigInteger('expiration');
+            $table->index('expiration', 'cache_expiration_index');
         });
 
         Schema::create('cache_locks', function (Blueprint $table) {
             $table->string('key')->primary();
             $table->string('owner');
-            $table->bigInteger('expiration')->index();
+            $table->bigInteger('expiration');
+            $table->index('expiration', 'cache_locks_expiration_index');
         });
     }
 
