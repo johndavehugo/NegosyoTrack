@@ -46,6 +46,22 @@ return [
         ['label' => 'Low', 'color' => '#28a745', 'min' => 0.00],
     ],
 
+    // Density ramp for the risk map's heat layer: MapLibre 'heatmap-density'
+    // (kernel weight, not risk) -> colour. Sequential and deliberately distinct
+    // from risk_bands, so blob colour never reads as a risk level — the small
+    // marker dots carry risk_bands, the blobs carry this. Single source for the
+    // heatmap-color expression and the legend gradient, so they cannot drift.
+    // Stops must stay ascending on [0..1].
+    'heat_ramp' => [
+        ['stop' => 0.00, 'color' => 'rgba(30, 64, 175, 0)'],
+        ['stop' => 0.10, 'color' => '#1d4ed8'],
+        ['stop' => 0.30, 'color' => '#0891b2'],
+        ['stop' => 0.50, 'color' => '#16a34a'],
+        ['stop' => 0.70, 'color' => '#ca8a04'],
+        ['stop' => 0.85, 'color' => '#ea580c'],
+        ['stop' => 1.00, 'color' => '#b91c1c'],
+    ],
+
     // Canonical 17-sector palette (PSIC-aligned, matches Industries::All()).
     'sector_colors' => [
         'AGRICULTURE' => '#28a745',

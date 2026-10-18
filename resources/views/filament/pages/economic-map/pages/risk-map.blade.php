@@ -1,5 +1,13 @@
 <x-filament-panels::page>
     <link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}">
+    @include('filament.pages.economic-map.partials.controls')
+
+    @php
+        $heatGradient = 'linear-gradient(90deg, '.collect(config('economic-map.heat_ramp', []))
+            ->sortBy('stop')
+            ->map(fn (array $stop): string => sprintf('%s %s%%', $stop['color'], round($stop['stop'] * 100, 2)))
+            ->implode(', ').')';
+    @endphp
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="w-full max-w-xl">
@@ -67,6 +75,15 @@
                     <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Areas with high MSME concentration and a history of losses score highest — pinpointing where a disaster would cause the greatest economic disruption.</p>
                 </div>
 
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Reading the map</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat blur</span> — where MSMEs physically cluster, straight from registry coordinates</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Marker dot</span> — the barangay's risk band, from exposure × historical damage</li>
+                    </ul>
+                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">The blur is concentration only. Read risk from the dots and the sidebar counts.</p>
+                </div>
+
                 @include('filament.pages.economic-map.partials.summary-card')
             </div>
 
@@ -74,13 +91,19 @@
             <div class="col-span-12 md:col-span-8 md:flex md:flex-col lg:col-span-9">
                 <div class="overflow-hidden rounded-lg shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
                     <div class="flex h-10 shrink-0 items-center gap-2 bg-[#1e2a78] px-4">
-                        <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🛡 Economic Risk Map — Linked to Calamity Monitoring</p>
+                        <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🛡 Economic Risk Map — MSME Density Heat Layer</p>
                         <span class="shrink-0 rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-[#1e2a78]">₱{{ number_format($totalDamage, 2) }} recorded</span>
                     </div>
                     <div class="relative md:min-h-0 md:flex-1">
                         <div id="risk-map" wire:ignore class="h-[60vh] w-full md:h-full"></div>
                         <div class="absolute bottom-10 right-3 rounded-lg bg-white/95 p-3 text-xs shadow-lg dark:bg-gray-900/95">
-                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk</p>
+                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">MSME Density</p>
+                            <div class="h-2 w-36 rounded-full" style="background: {{ $heatGradient }};"></div>
+                            <div class="mt-0.5 flex justify-between text-[10px] text-gray-400">
+                                <span>Sparse</span>
+                                <span>Dense</span>
+                            </div>
+                            <p class="mb-1.5 mt-2.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Level</p>
                             @foreach (config('economic-map.risk_bands', []) as $band)
                                 <div class="flex items-center gap-2 py-0.5 text-gray-600 dark:text-gray-300">
                                     <span class="h-2.5 w-2.5 rounded-full" style="background: {{ $band['color'] }};"></span>
@@ -95,23 +118,49 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Risk levels — Critical, High, Moderate, Low. Click a circle for the full risk breakdown.',
+        'slot' => 'Heat blur shows where MSMEs cluster. Dot colour shows risk — Critical, High, Moderate, Low. Click a dot for the full risk breakdown.',
     ])
 
     <script type="module">
         import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
 
         const barangays = @js($barangays);
+        const heatPoints = @js($heatPoints);
         const bounds = @js($bounds);
         const basemap = @js(config('economic-map.basemap'));
+        const heatRamp = @js(config('economic-map.heat_ramp'));
         const el = document.getElementById('risk-map');
 
         const norm = (e) => e?.detail?.[0] ?? e?.detail ?? {};
         let map = null;
         let popup = null;
 
-        const radius = (score) => 9 + 12 * Math.sqrt(Math.max(score, 0));
         const money = (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        const heatFeatures = () => ({
+            type: 'FeatureCollection',
+            features: heatPoints.map(([lat, lng]) => ({
+                type: 'Feature',
+                properties: {},
+                geometry: { type: 'Point', coordinates: [lng, lat] },
+            })),
+        });
+
+        const centerFeatures = () => ({
+            type: 'FeatureCollection',
+            features: barangays.map((b) => ({
+                type: 'Feature',
+                properties: {
+                    barangay: b.barangay, score: b.score, color: b.color, level: b.level,
+                    count: b.business_count, exposure: b.exposure,
+                    affected: b.affected_count, damage: b.total_damage,
+                },
+                geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
+            })),
+        });
+
+        const heatColor = ['interpolate', ['linear'], ['heatmap-density']];
+        for (const stop of [...heatRamp].sort((a, b) => a.stop - b.stop)) heatColor.push(stop.stop, stop.color);
 
         function boot() {
             if (! el || map) return;
@@ -140,33 +189,32 @@
                 map.addSource('osm', { type: 'raster', tiles: basemap.tiles, tileSize: basemap.tile_size, attribution: basemap.attribution, maxzoom: basemap.max_zoom });
                 map.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
 
-                map.addSource('circles', {
-                    type: 'geojson',
-                    data: {
-                        type: 'FeatureCollection',
-                        features: barangays.map((b) => ({
-                            type: 'Feature',
-                            properties: {
-                                barangay: b.barangay, score: b.score, color: b.color, level: b.level,
-                                radius: radius(b.score), count: b.business_count,
-                                exposure: b.exposure, affected: b.affected_count, damage: b.total_damage,
-                            },
-                            geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
-                        })),
+                map.addSource('heat', { type: 'geojson', data: heatFeatures() });
+                map.addLayer({
+                    id: 'heat', type: 'heatmap', source: 'heat', maxzoom: 17,
+                    paint: {
+                        // Blur = business concentration only. Band colouring lives on
+                        // the center markers, so these two never share a scale.
+                        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 14, 12, 26, 14, 42, 16, 60],
+                        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.7, 13, 1.3, 16, 2.2],
+                        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.95, 14, 0.55, 17, 0.25],
+                        'heatmap-color': heatColor,
                     },
                 });
+
+                map.addSource('centers', { type: 'geojson', data: centerFeatures() });
                 map.addLayer({
-                    id: 'circles', type: 'circle', source: 'circles',
+                    id: 'centers', type: 'circle', source: 'centers',
                     paint: {
-                        'circle-radius': ['get', 'radius'],
+                        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6.5],
                         'circle-color': ['get', 'color'],
-                        'circle-opacity': 0.65,
-                        'circle-stroke-width': 2,
+                        'circle-opacity': 0.95,
+                        'circle-stroke-width': 1.5,
                         'circle-stroke-color': '#ffffff',
                     },
                 });
 
-                map.on('click', 'circles', (e) => {
+                map.on('click', 'centers', (e) => {
                     const p = e.features?.[0]?.properties;
                     if (! p) return;
 
@@ -186,8 +234,8 @@
 
                     if (window.Livewire) window.Livewire.dispatch('emap-select-barangay', { barangay: p.barangay });
                 });
-                map.on('mouseenter', 'circles', () => (map.getCanvas().style.cursor = 'pointer'));
-                map.on('mouseleave', 'circles', () => (map.getCanvas().style.cursor = ''));
+                map.on('mouseenter', 'centers', () => (map.getCanvas().style.cursor = 'pointer'));
+                map.on('mouseleave', 'centers', () => (map.getCanvas().style.cursor = ''));
 
                 if (bounds) map.fitBounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]], { padding: 40 });
             });
