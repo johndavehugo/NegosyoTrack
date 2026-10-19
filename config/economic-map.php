@@ -28,6 +28,24 @@ return [
         ['label' => 'Low', 'color' => '#ffc107', 'min' => 0.00],
     ],
 
+    // Opportunity bands, evaluated top-down on composite score 0..1.
+    // Score blends commercial density, growth momentum, and livelihood gap.
+    'opportunity_bands' => [
+        ['label' => 'Very High', 'color' => '#16a34a', 'min' => 0.60],
+        ['label' => 'High',      'color' => '#3b82f6', 'min' => 0.30],
+        ['label' => 'Moderate',  'color' => '#d97706', 'min' => 0.15],
+        ['label' => 'Low',       'color' => '#6b7280', 'min' => 0.00],
+    ],
+
+    // Risk bands, evaluated top-down on normalized score 0..1.
+    // Score = exposure × damage factor (no hazard input — see service).
+    'risk_bands' => [
+        ['label' => 'Critical', 'color' => '#dc3545', 'min' => 0.66],
+        ['label' => 'High', 'color' => '#fd7e14', 'min' => 0.40],
+        ['label' => 'Moderate', 'color' => '#ffc107', 'min' => 0.20],
+        ['label' => 'Low', 'color' => '#28a745', 'min' => 0.00],
+    ],
+
     // Canonical 17-sector palette (PSIC-aligned, matches Industries::All()).
     'sector_colors' => [
         'AGRICULTURE' => '#28a745',
