@@ -43,11 +43,6 @@ class ViewBusiness extends Page implements HasForms
         if ($this->section === 'business') {
             $breadcrumbs[] = 'Business Information';
         }
-
-        // if ($this->section === 'address') {
-        //     $breadcrumbs[] = 'Address Information';
-        // }
-
         return $breadcrumbs;
     }
 
