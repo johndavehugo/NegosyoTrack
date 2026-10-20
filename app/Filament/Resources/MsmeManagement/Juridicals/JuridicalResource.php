@@ -24,6 +24,7 @@ class JuridicalResource extends Resource
     protected static ?string $pluralModelLabel = 'Businesses';
 
     protected static ?string $modelLabel = 'Business';
+    protected static bool $shouldRegisterNavigation = false;
 
     public static function getNavigationGroup(): ?string
     {

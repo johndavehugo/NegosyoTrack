@@ -8,6 +8,7 @@ use App\Http\Resources\MsmeResource;
 use App\Models\MsmeManagement\Address;
 use App\Models\MsmeManagement\Employer;
 use App\Models\MsmeManagement\Juridical;
+use Http;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
