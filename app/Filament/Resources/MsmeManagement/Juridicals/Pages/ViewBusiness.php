@@ -74,6 +74,10 @@ class ViewBusiness extends Page implements HasSchemas
             $breadcrumbs[] = 'Address Information';
         }
 
+        if ($this->section === 'trainings') {
+            $breadcrumbs[] = 'Trainings Attended';
+        }
+
         return $breadcrumbs;
     }
 

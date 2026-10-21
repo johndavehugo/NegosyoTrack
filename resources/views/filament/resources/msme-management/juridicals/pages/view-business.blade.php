@@ -128,6 +128,23 @@
 
                         </button>
 
+                        {{-- Menu item --}}
+                        <button type="button" wire:click="showSection('trainings')"
+                            class="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-white/5">
+                            <span class="flex items-center gap-3">
+
+                                <x-heroicon-o-academic-cap class="h-5 w-5 text-gray-500" />
+
+                                <span class="text-sm font-medium">
+                                    Trainings Attended
+                                </span>
+
+                            </span>
+
+                            <x-heroicon-o-chevron-right class="h-5 w-5 text-gray-400" />
+
+                        </button>
+
                     </div>
 
                 </div>
@@ -144,6 +161,78 @@
         @elseif ($section === 'address')
             <div class="msme-form">
                 {{ $this->addressForm }}
+            </div>
+
+        @elseif ($section === 'trainings')
+            @php
+                $trainings = $this->record->trainingInfo()
+                    ->orderByDesc('from_date')
+                    ->get();
+            @endphp
+
+            <div class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
+
+                @if ($trainings->isEmpty())
+                    <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
+                        <x-heroicon-o-academic-cap class="mb-3 h-12 w-12 text-gray-300 dark:text-gray-600" />
+                        <p class="text-sm font-semibold text-gray-500">No training records yet</p>
+                        <p class="mt-1 text-xs text-gray-400">This business has no training records on file.</p>
+                    </div>
+                @else
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-gray-200 bg-gray-50 dark:border-white/5 dark:bg-white/5">
+                                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Training Program</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Type</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Duration</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Conducted By</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Graduated</th>
+                                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 dark:divide-white/5">
+                            @foreach ($trainings as $ti)
+                            <tr class="hover:bg-gray-50 dark:hover:bg-white/5">
+                                <td class="px-4 py-3">
+                                    <p class="font-medium text-gray-800 dark:text-gray-200">{{ $ti->training_program }}</p>
+                                    @if($ti->sector)
+                                        <p class="text-xs text-gray-400 mt-0.5">{{ $ti->sector }}</p>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3">
+                                    <span class="inline-block rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-semibold text-indigo-700 dark:bg-indigo-400/10 dark:text-indigo-400">
+                                        {{ $ti->training_type }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 text-gray-500 text-xs">
+                                    {{ $ti->from_date?->format('M d, Y') }} – {{ $ti->to_date?->format('M d, Y') }}
+                                    <p class="text-gray-400">{{ $ti->hours_no }} hrs</p>
+                                </td>
+                                <td class="px-4 py-3 text-gray-500 text-xs">
+                                    {{ $ti->conducted_by }}
+                                </td>
+                                <td class="px-4 py-3 text-gray-500 text-xs">
+                                    {{ $ti->graduated_at?->format('M d, Y') ?? '—' }}
+                                </td>
+                                <td class="px-4 py-3">
+                                    @php
+                                        $statusColor = match($ti->status) {
+                                            'COMPLETED'  => 'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400',
+                                            'ONGOING'    => 'bg-amber-50 text-amber-700 dark:bg-amber-400/10 dark:text-amber-400',
+                                            'DROPPED'    => 'bg-red-50 text-red-700 dark:bg-red-400/10 dark:text-red-400',
+                                            'INCOMPLETE' => 'bg-orange-50 text-orange-700 dark:bg-orange-400/10 dark:text-orange-400',
+                                            default      => 'bg-gray-100 text-gray-600',
+                                        };
+                                    @endphp
+                                    <span class="inline-block rounded-md px-2 py-0.5 text-xs font-semibold {{ $statusColor }}">
+                                        {{ ucfirst(strtolower($ti->status)) }}
+                                    </span>
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
             </div>
 
         @endif

@@ -3,6 +3,7 @@
 namespace App\Models\MsmeManagement;
 
 use App\Models\CalamityMonitoring\Incident;
+use App\Models\Training\TrainingInfo;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -54,5 +55,10 @@ class Juridical extends Model
     public function incident(): HasMany
     {
         return $this->hasMany(Incident::class);
+    }
+
+    public function trainingInfo(): HasMany
+    {
+        return $this->hasMany(TrainingInfo::class, 'entity_no', 'entity_no');
     }
 }
