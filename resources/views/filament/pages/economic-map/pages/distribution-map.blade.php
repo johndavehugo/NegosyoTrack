@@ -11,10 +11,10 @@
 
     @if (! $hasData)
         <div class="rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-900">
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">No geocoded businesses yet</p>
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">No business data yet</p>
             <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-                Sector distribution needs coordinates to plot. Set them in
-                <a href="{{ \App\Filament\Pages\EconomicMap\BusinessLocations::getUrl() }}" class="font-medium text-blue-700 hover:underline">Business Locations</a>.
+                The SCIMS registry snapshot is empty. Run
+                <span class="font-mono">php artisan economic-map:sync</span> or wait for the scheduled sync, then refresh this page.
             </p>
         </div>
     @else
@@ -120,7 +120,7 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Distribution reflects the dominant industry sector per barangay from the local registry. Select a sector to view its individual registered MSME locations.',
+        'slot' => 'Distribution reflects the dominant industry sector per barangay from the SCIMS registry. Barangays without GPS coordinates are plotted at their approximate centre. Select a sector to highlight its businesses.',
     ])
 
     <script type="module">

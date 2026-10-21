@@ -1,14 +1,51 @@
 <?php
 
 // Economic Map tunables — presentation + policy values only.
-// No locations, no coordinates, no LGU datasets live here:
-// live data comes from GET /api/msme, reference places from AddressApiService.
+// Business + address data comes from the SCIMS juridical API; reference
+// places come from AddressApiService. Calamity totals stay in MySQL.
 return [
-    // Seconds the /api/msme business list is cached.
+    // Seconds the SCIMS business snapshot is cached. The scheduled
+    // economic-map:sync command refreshes it, and a last-good copy is
+    // retained for seven days if SCIMS is unavailable.
     'cache_ttl_seconds' => 21600,
 
     // Cache key prefix for all economic-map entries.
     'cache_prefix' => 'economic_map',
+
+    // Dedicated store for the multi-megabyte SCIMS snapshot. Keep this on a
+    // file/Redis store; the database cache can exceed max_allowed_packet.
+    'business_cache_store' => env('ECONOMIC_MAP_CACHE_STORE', 'economic-map'),
+
+    // Display-only barangay centres used when SCIMS rows have no lat/lng.
+    // SCIMS exposes address text only, so aggregate maps plot each barangay
+    // at its approximate centre instead of dropping it. Replace these with
+    // surveyed coordinates when they become available. Keys are normalized
+    // with EconomicMapService::normalizePlace().
+    'barangay_centroids' => [
+        'bagonbon' => [10.5830880, 123.3976730],
+        'buluangan' => [10.3854749, 123.3380553],
+        'codcod' => [10.4580638, 123.2167268],
+        'ermita' => [10.4451333, 123.4178966],
+        'guadalupe' => [10.4543580, 123.3664640],
+        // Some SCIMS records use this neighbouring Vallehermoso barangay.
+        'macapso' => [10.3777000, 123.3317000],
+        'nataban' => [10.4963672, 123.3051995],
+        'palampas' => [10.5231890, 123.3942330],
+        'i' => [10.4849928, 123.4198576],
+        'ii' => [10.4808069, 123.4146528],
+        'iii' => [10.4828613, 123.4244736],
+        'iv' => [10.4830000, 123.4210000],
+        'v' => [10.4790954, 123.4129110],
+        'vi' => [10.4795504, 123.4224985],
+        'prosperidad' => [10.5181471, 123.3061980],
+        'punao' => [10.5283256, 123.4327758],
+        'quezon' => [10.4392722, 123.2497611],
+        'rizal' => [10.4880260, 123.3961847],
+        'san juan' => [10.4621858, 123.4398743],
+    ],
+
+    // Fallback when a SCIMS barangay has no configured centre.
+    'city_center' => [10.4849, 123.4199],
 
     // OSM raster basemap for MapLibre (no key required).
     'basemap' => [

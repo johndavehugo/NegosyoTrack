@@ -56,6 +56,5 @@ class HotspotMap extends BaseMapPage
         $this->bounds = $service->bounds();
         $this->hasData = $this->total > 0;
         $this->barangayOptions = $service->locationOptions()['barangays'];
-        $this->loadUnsetCount();
     }
 }

@@ -9,21 +9,18 @@
             ->implode(', ').')';
     @endphp
 
-    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div class="w-full max-w-xl">
-            @include('filament.pages.economic-map.partials.search-bar')
-        </div>
-        @include('filament.pages.economic-map.partials.unset-pill')
+    <div class="mb-4 max-w-xl">
+        @include('filament.pages.economic-map.partials.search-bar')
     </div>
 
     @include('filament.pages.economic-map.partials.map-tabs', ['active' => 'risk'])
 
     @if (! $hasData)
         <div class="rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-900">
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">No geocoded businesses yet</p>
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">No business data yet</p>
             <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-                Risk scoring needs business locations to compute exposure. Set them in
-                <a href="{{ \App\Filament\Pages\EconomicMap\BusinessLocations::getUrl() }}" class="font-medium text-blue-700 hover:underline">Business Locations</a>.
+                Risk scoring needs SCIMS business records to compute exposure. Run
+                <span class="font-mono">php artisan economic-map:sync</span> or wait for the scheduled sync, then refresh this page.
             </p>
         </div>
     @else
@@ -69,7 +66,7 @@
                     <p class="text-xs font-medium uppercase tracking-wide text-gray-400">How it's calculated</p>
                     <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">Economic Risk = Business Exposure × Historical Damage</p>
                     <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Exposure</span> — number of MSMEs in the area (local registry)</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Exposure</span> — number of MSMEs in the area (SCIMS registry)</li>
                         <li><span class="font-medium text-gray-700 dark:text-gray-300">Damage</span> — prior losses recorded in Calamity Monitoring</li>
                     </ul>
                     <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Areas with high MSME concentration and a history of losses score highest — pinpointing where a disaster would cause the greatest economic disruption.</p>

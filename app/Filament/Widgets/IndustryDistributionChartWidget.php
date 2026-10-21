@@ -41,32 +41,14 @@ class IndustryDistributionChartWidget extends ApexChartWidget
             ->values()
             ->toArray();
 
-        $data   = $sectors->pluck('count')->values()->toArray();
-        $colors = $sectors->pluck('color')->values()->toArray();
-
-        // Fallback if no geocoded data: use raw DB counts grouped by line_of_industry
-        if (empty($data)) {
-            $rows = \App\Models\MsmeManagement\Juridical::selectRaw('line_of_industry, COUNT(*) as total')
-                ->whereNotNull('line_of_industry')
-                ->groupBy('line_of_industry')
-                ->orderByDesc('total')
-                ->limit(8)
-                ->get();
-
-            $labels = $rows->pluck('line_of_industry')
-                ->map(fn ($n) => strlen($n) > 30 ? substr($n, 0, 27).'...' : $n)
-                ->toArray();
-            $data   = $rows->pluck('total')->map(fn ($v) => (int) $v)->toArray();
-            $colors = ['#DC2626', '#B91C1C', '#991B1B', '#7F1D1D',
-                       '#EF4444', '#F87171', '#FCA5A5', '#FEE2E2'];
-        }
+        $data = $sectors->pluck('count')->values()->toArray();
 
         return [
             'chart' => [
-                'type'       => 'bar',
-                'height'     => 320,
+                'type' => 'bar',
+                'height' => 320,
                 'fontFamily' => 'inherit',
-                'toolbar'    => ['show' => false],
+                'toolbar' => ['show' => false],
             ],
             'series' => [
                 [
@@ -76,36 +58,36 @@ class IndustryDistributionChartWidget extends ApexChartWidget
             ],
             'xaxis' => [
                 'categories' => $labels,
-                'labels'     => [
+                'labels' => [
                     'style' => ['fontFamily' => 'inherit', 'fontSize' => '11px'],
-                    'trim'  => true,
+                    'trim' => true,
                 ],
             ],
             'yaxis' => [
                 'labels' => ['style' => ['fontFamily' => 'inherit']],
             ],
-            'colors'      => ['#DC2626'],
+            'colors' => ['#DC2626'],
             'plotOptions' => [
                 'bar' => [
-                    'horizontal'        => true,
-                    'borderRadius'      => 4,
-                    'distributed'       => true,
-                    'barHeight'         => '65%',
-                    'dataLabels'        => ['position' => 'top'],
+                    'horizontal' => true,
+                    'borderRadius' => 4,
+                    'distributed' => true,
+                    'barHeight' => '65%',
+                    'dataLabels' => ['position' => 'top'],
                 ],
             ],
             'dataLabels' => [
-                'enabled'  => true,
-                'offsetX'  => 14,
-                'style'    => [
+                'enabled' => true,
+                'offsetX' => 14,
+                'style' => [
                     'fontFamily' => 'inherit',
                     'fontWeight' => 700,
-                    'colors'    => ['#0f172a'],
+                    'colors' => ['#0f172a'],
                 ],
             ],
             'legend' => ['show' => false],
-            'grid'   => [
-                'borderColor'     => '#f1f5f9',
+            'grid' => [
+                'borderColor' => '#f1f5f9',
                 'strokeDashArray' => 4,
             ],
             'tooltip' => ['style' => ['fontFamily' => 'inherit']],

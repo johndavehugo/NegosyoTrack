@@ -56,7 +56,6 @@ class DistributionMap extends BaseMapPage
         $this->total = $distribution['total'];
         $this->bounds = $service->bounds();
         $this->hasData = $this->total > 0;
-        $this->loadUnsetCount();
     }
 
     public function selectSector(string $sector): void

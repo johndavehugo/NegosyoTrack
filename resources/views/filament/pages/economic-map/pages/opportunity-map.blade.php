@@ -10,11 +10,10 @@
 
     @if (! $hasData)
         <div class="rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-900">
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">No geocoded businesses yet</p>
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">No business data yet</p>
             <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-                Opportunity circles need real coordinates. Set them in
-                <a href="{{ \App\Filament\Pages\EconomicMap\BusinessLocations::getUrl() }}" class="font-medium text-blue-700 hover:underline">Business Locations</a>
-                and the map will populate.
+                The SCIMS registry snapshot is empty. Run
+                <span class="font-mono">php artisan economic-map:sync</span> or wait for the scheduled sync, then refresh this page.
             </p>
         </div>
     @else
@@ -152,7 +151,7 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Opportunity scores blend commercial density, new-registration growth, sector diversity, agriculture share, and livelihood gap — all relative to other barangays. Population per barangay is sourced live from the Philippine Standard Geographic Code API.',
+        'slot' => 'Opportunity scores blend commercial density, new-registration growth, sector diversity, agriculture share, and livelihood gap — all relative to other barangays. Business counts come from the SCIMS registry; barangays without GPS coordinates are plotted at their approximate centre. Population is sourced from the Philippine Standard Geographic Code API.',
     ])
 
     <script type="module">

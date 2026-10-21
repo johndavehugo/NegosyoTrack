@@ -2,8 +2,10 @@
 
 namespace App\Filament\Pages\EconomicMap;
 
+use App\Jobs\SyncEconomicMapData;
 use App\Services\EconomicMapService;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
@@ -11,7 +13,7 @@ use Livewire\Attributes\On;
 
 /**
  * Shared behaviour for the Economic Map pages: sidebar grouping,
- * area search, data refresh, and the unset-location pill count.
+ * area search, and data refresh.
  */
 abstract class BaseMapPage extends Page
 {
@@ -20,8 +22,6 @@ abstract class BaseMapPage extends Page
     public string $searchQuery = '';
 
     public array $searchResults = [];
-
-    public int $unsetCount = 0;
 
     public ?array $summary = null;
 
@@ -43,11 +43,15 @@ abstract class BaseMapPage extends Page
                 ->color('gray')
                 ->requiresConfirmation()
                 ->modalHeading('Refresh map data?')
-                ->modalDescription('Re-fetches GET /api/msme and rebuilds every figure on this page.')
+                ->modalDescription('Fetches the latest business registry from SCIMS and rebuilds every figure on this page.')
                 ->action(function (): void {
-                    app(EconomicMapService::class)->refresh();
-                    $this->loadData();
-                    $this->dispatch('emap-data-refreshed');
+                    SyncEconomicMapData::dispatch();
+
+                    Notification::make()
+                        ->title('SCIMS sync queued')
+                        ->body('The map will use the new snapshot when the background sync finishes.')
+                        ->success()
+                        ->send();
                 }),
         ];
     }
@@ -131,11 +135,6 @@ abstract class BaseMapPage extends Page
     public function selectBarangayFromMap(string $barangay): void
     {
         $this->selectBarangay($barangay);
-    }
-
-    protected function loadUnsetCount(): void
-    {
-        $this->unsetCount = app(EconomicMapService::class)->unsetCount();
     }
 
     abstract protected function loadData(): void;

@@ -47,16 +47,14 @@ class OpportunityMap extends BaseMapPage
     protected function loadData(): void
     {
         $service = app(EconomicMapService::class);
-        $data    = $service->opportunities();
+        $data = $service->opportunities();
 
-        $this->ranked         = $data['ranked'];
-        $this->barangayCount  = $data['barangay_count'];
-        $this->highVeryHigh   = $data['high_very_high'];
-        $this->highlights     = $data['highlights'];
-        $this->howCalculated  = $data['how_calculated'];
-        $this->bounds         = $service->bounds();
-        $this->hasData        = count($this->ranked) > 0;
-
-        $this->loadUnsetCount();
+        $this->ranked = $data['ranked'];
+        $this->barangayCount = $data['barangay_count'];
+        $this->highVeryHigh = $data['high_very_high'];
+        $this->highlights = $data['highlights'];
+        $this->howCalculated = $data['how_calculated'];
+        $this->bounds = $service->bounds();
+        $this->hasData = count($this->ranked) > 0;
     }
 }

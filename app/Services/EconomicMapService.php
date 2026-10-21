@@ -4,16 +4,19 @@ namespace App\Services;
 
 use App\Enums\Industries;
 use App\Services\EconomicMap\CalamityFeed;
-use Illuminate\Http\Client\ConnectionException;
+use App\Services\EconomicMap\ScimsBusinessClient;
+use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Http;
+use RuntimeException;
 
 /**
- * Economic Map data layer. No models — everything derives from
- * GET /api/msme (cached), plus reference places via AddressApiService.
+ * Economic Map data layer. No models — business and address data comes
+ * from the SCIMS juridical API (cached), plus reference places via
+ * AddressApiService.
  *
- * Only geocoded rows (real, nonzero lat/long) ever reach the maps.
- * Rows without coordinates surface through unsetLocations() instead.
+ * SCIMS exposes address text but no latitude/longitude, so aggregate maps
+ * plot each barangay at a display-only centre from config/economic-map.php.
+ * Individual pins are only rendered for rows with real coordinates.
  */
 class EconomicMapService
 {
@@ -42,7 +45,10 @@ class EconomicMapService
 
     public const DEFAULT_SECTOR = 'OTHER COMMUNITY, SOCIAL AND PERSONAL SERVICE ACTIVITIES';
 
-    public function __construct(protected CalamityFeed $calamities) {}
+    public function __construct(
+        protected CalamityFeed $calamities,
+        protected ScimsBusinessClient $scims,
+    ) {}
 
     // ── Source ────────────────────────────────────────────────────
 
@@ -53,36 +59,131 @@ class EconomicMapService
 
     protected function listKey(): string
     {
-        return config('economic-map.cache_prefix', 'economic_map').'.msme_list';
+        return config('economic-map.cache_prefix', 'economic_map').'.business_list';
     }
 
-    /** Raw /api/msme rows. Only this is cached; aggregates compute per request. */
+    protected function staleKey(): string
+    {
+        return $this->listKey().'.stale';
+    }
+
+    /**
+     * Dedicated store for the large SCIMS snapshot.
+     *
+     * Defaults to a file-backed store; the database cache rejects the
+     * multi-megabyte payload on some MySQL configurations.
+     */
+    protected function businessCache(): CacheRepository
+    {
+        return Cache::store(config('economic-map.business_cache_store', 'economic-map'));
+    }
+
+    /**
+     * Cached, normalized SCIMS business rows.
+     *
+     * Web requests never page through SCIMS themselves — a full sync takes
+     * dozens of API calls. The scheduled command/job owns that work, and this
+     * method only reads the fresh snapshot or the last-good copy.
+     */
     public function businessList(bool $refresh = false): array
     {
         if ($refresh) {
-            Cache::forget($this->listKey());
+            $this->refresh();
         }
 
-        return Cache::remember($this->listKey(), $this->ttl(), function (): array {
-            try {
-                $response = Http::acceptJson()->timeout(60)->get(url('/api/msme'));
-            } catch (ConnectionException) {
-                return [];
-            }
+        $cached = $this->businessCache()->get($this->listKey());
 
-            if ($response->failed()) {
-                return [];
-            }
+        if (is_array($cached)) {
+            return $cached;
+        }
 
-            $data = $response->json('data', []);
+        $lastGood = $this->businessCache()->get($this->staleKey());
 
-            return is_array($data) ? $data : [];
-        });
+        return is_array($lastGood) ? $lastGood : [];
+    }
+
+    /**
+     * Fetch every SCIMS page and replace the cached snapshot.
+     *
+     * @return int Number of businesses cached.
+     */
+    public function sync(): int
+    {
+        $rows = $this->fetchBusinesses();
+
+        if ($rows === []) {
+            throw new RuntimeException('SCIMS returned no business records.');
+        }
+
+        $this->storeBusinesses($rows);
+
+        return count($rows);
+    }
+
+    /**
+     * Page through the SCIMS juridical endpoint until the API's last page.
+     *
+     * The SCIMS endpoint caps each response at 100 rows, regardless of the
+     * requested per-page value, so the map walks the paginator directly.
+     */
+    protected function fetchBusinesses(): array
+    {
+        $perPage = 100;
+        $first = $this->scims->page(1, $perPage);
+        $rows = collect($first->items())->values();
+        $lastPage = $first->lastPage();
+
+        for ($page = 2; $page <= $lastPage; $page++) {
+            $rows = $rows->merge(
+                collect($this->scims->page($page, $perPage)->items())->values(),
+            );
+        }
+
+        return $rows
+            ->filter(fn (mixed $row): bool => is_array($row))
+            ->map(fn (array $row): array => $this->normalizeScimsRow($row))
+            ->values()
+            ->all();
+    }
+
+    protected function storeBusinesses(array $rows): void
+    {
+        $cache = $this->businessCache();
+
+        $cache->put($this->listKey(), $rows, now()->addSeconds($this->ttl()));
+        $cache->put($this->staleKey(), $rows, now()->addDays(7));
+    }
+
+    /**
+     * Convert a flat SCIMS juridical row into the shape used by the maps.
+     *
+     * Only fields the Economic Map reads are retained. SCIMS returns several
+     * dozen columns (owner, employer, contact, etc.); keeping them would make
+     * the cached snapshot several times larger for no map benefit.
+     */
+    protected function normalizeScimsRow(array $row): array
+    {
+        return [
+            'juridical' => [
+                'entity_no' => $row['entity_no'] ?? null,
+                'name' => $row['juri_name'] ?? $row['trade_name'] ?? null,
+                'registration_type' => $row['status'] ?? null,
+                'msme_category' => $row['juri_category'] ?? null,
+                'line_of_industry' => $row['line_of_industry'] ?? null,
+                'region' => $row['region'] ?? null,
+                'province' => $row['province'] ?? null,
+                'city' => $row['city'] ?? null,
+                'barangay' => $row['barangay'] ?? null,
+                'street' => $row['street'] ?? null,
+                'longitude' => $row['longitude'] ?? null,
+                'latitude' => $row['latitude'] ?? null,
+            ],
+        ];
     }
 
     public function refresh(): void
     {
-        Cache::forget($this->listKey());
+        $this->businessCache()->forget($this->listKey());
     }
 
     public function calamityFeed(): CalamityFeed
@@ -148,6 +249,14 @@ class EconomicMapService
             ?? config('economic-map.sector_fallback_color', '#6c757d');
     }
 
+    /** Every valid SCIMS business row, geocoded or not. */
+    public function businessRows(?array $rows = null): array
+    {
+        $rows ??= $this->businessList();
+
+        return array_values(array_filter($rows, 'is_array'));
+    }
+
     /** Rows whose business address carries real coordinates. */
     public function geocodedRows(?array $rows = null): array
     {
@@ -160,12 +269,18 @@ class EconomicMapService
         ));
     }
 
-    /** Group geocoded rows by normalized barangay. */
+    /**
+     * Group every business row by normalized barangay.
+     *
+     * Coordinates are averaged when rows carry real lat/lng; otherwise the
+     * display-only barangay centre from config is used so aggregate maps
+     * still render the SCIMS counts.
+     */
     protected function groupByBarangay(?array $rows = null): array
     {
         $groups = [];
 
-        foreach ($this->geocodedRows($rows) as $row) {
+        foreach ($this->businessRows($rows) as $row) {
             $raw = trim((string) ($row['juridical']['barangay'] ?? ''));
             $key = static::normalizePlace($raw);
 
@@ -180,14 +295,44 @@ class EconomicMapService
 
         foreach ($groups as $key => $group) {
             arsort($group['names']);
-            $groups[$key]['barangay'] = trim((string) array_key_first($group['names']));
-            $lats = array_map(fn (array $r): float => (float) $r['juridical']['latitude'], $group['rows']);
-            $lngs = array_map(fn (array $r): float => (float) $r['juridical']['longitude'], $group['rows']);
-            $groups[$key]['lat'] = array_sum($lats) / count($lats);
-            $groups[$key]['lng'] = array_sum($lngs) / count($lngs);
+            $barangay = trim((string) array_key_first($group['names']));
+            $groups[$key]['barangay'] = $barangay;
+
+            $located = array_values(array_filter(
+                $group['rows'],
+                fn (array $r): bool => static::hasCoords(
+                    $r['juridical']['latitude'] ?? null,
+                    $r['juridical']['longitude'] ?? null,
+                ),
+            ));
+
+            if ($located !== []) {
+                $lats = array_map(fn (array $r): float => (float) $r['juridical']['latitude'], $located);
+                $lngs = array_map(fn (array $r): float => (float) $r['juridical']['longitude'], $located);
+                $groups[$key]['lat'] = array_sum($lats) / count($lats);
+                $groups[$key]['lng'] = array_sum($lngs) / count($lngs);
+            } else {
+                [$lat, $lng] = $this->barangayCentroid($barangay);
+                $groups[$key]['lat'] = $lat;
+                $groups[$key]['lng'] = $lng;
+            }
         }
 
         return $groups;
+    }
+
+    /**
+     * Display-only fallback centre for a barangay.
+     *
+     * @return array{0: float, 1: float}
+     */
+    protected function barangayCentroid(?string $barangay): array
+    {
+        $key = static::normalizePlace($barangay);
+        $centroids = config('economic-map.barangay_centroids', []);
+        $fallback = config('economic-map.city_center', [10.4849, 123.4199]);
+
+        return $centroids[$key] ?? $fallback;
     }
 
     protected function hotspotLevel(float $ratio): array
@@ -317,7 +462,18 @@ class EconomicMapService
     public function risk(?int $calamityId = null): array
     {
         $groups = $this->groupByBarangay();
-        $damage = $this->calamities->damageByBarangay($calamityId);
+        $entityBarangays = [];
+
+        foreach ($this->businessRows() as $row) {
+            $entityNo = trim((string) ($row['juridical']['entity_no'] ?? ''));
+            $barangay = trim((string) ($row['juridical']['barangay'] ?? ''));
+
+            if ($entityNo !== '' && $barangay !== '') {
+                $entityBarangays[$entityNo] = $barangay;
+            }
+        }
+
+        $damage = $this->calamities->damageByBarangay($calamityId, $entityBarangays);
 
         $mergedDamage = [];
 
@@ -456,9 +612,10 @@ class EconomicMapService
         }
 
         $key = static::normalizePlace($query);
+        $groups = $this->groupByBarangay();
         $matches = [];
 
-        foreach ($this->groupByBarangay() as $group) {
+        foreach ($groups as $group) {
             if ($group['key'] === $key || str_contains($group['key'], $key)) {
                 $matches[] = [
                     'type' => 'barangay',
@@ -471,7 +628,9 @@ class EconomicMapService
             }
         }
 
-        foreach ($this->geocodedRows() as $row) {
+        $seen = [];
+
+        foreach ($this->businessRows() as $row) {
             if (count($matches) >= 30) {
                 break;
             }
@@ -482,13 +641,28 @@ class EconomicMapService
                 continue;
             }
 
+            $barangay = trim((string) ($row['juridical']['barangay'] ?? ''));
+            $group = $groups[static::normalizePlace($barangay)] ?? null;
+
+            if ($group === null) {
+                continue;
+            }
+
+            $dedupeKey = static::normalizePlace($barangay).'|'.static::normalizePlace($street);
+
+            if (isset($seen[$dedupeKey])) {
+                continue;
+            }
+
+            $seen[$dedupeKey] = true;
+
             $matches[] = [
                 'type' => 'street',
-                'label' => "{$street}, ".($row['juridical']['barangay'] ?? ''),
-                'barangay' => $row['juridical']['barangay'] ?? null,
+                'label' => "{$street}, {$barangay}",
+                'barangay' => $barangay,
                 'street' => $street,
-                'lat' => (float) $row['juridical']['latitude'],
-                'lng' => (float) $row['juridical']['longitude'],
+                'lat' => $group['lat'],
+                'lng' => $group['lng'],
             ];
         }
 
@@ -500,7 +674,7 @@ class EconomicMapService
         $key = static::normalizePlace($barangay);
         $matched = [];
 
-        foreach ($this->geocodedRows() as $row) {
+        foreach ($this->businessRows() as $row) {
             if (static::normalizePlace($row['juridical']['barangay'] ?? null) !== $key) {
                 continue;
             }
@@ -570,85 +744,6 @@ class EconomicMapService
         ];
     }
 
-    // ── Unset locations ─────────────────────────────────────────
-
-    protected function unsetEntry(array $row, string $side): ?array
-    {
-        $address = $side === 'employer'
-            ? ($row['employer'] ?? [])
-            : ($row['juridical'] ?? []);
-
-        if (static::hasCoords($address['latitude'] ?? null, $address['longitude'] ?? null)) {
-            return null;
-        }
-
-        return [
-            'side' => $side,
-            'business_name' => $row['juridical']['name'] ?? '—',
-            'address_id' => $address['address_id'] ?? null,
-            'region' => $address['region'] ?? null,
-            'province' => $address['province'] ?? null,
-            'city' => $address['city'] ?? null,
-            'barangay' => $address['barangay'] ?? null,
-            'street' => $address['street'] ?? null,
-            'subdivision' => $address['subdivision'] ?? null,
-            'unit_bldg_no' => $address['upblb_num'] ?? null,
-            'zip' => $address['zip'] ?? null,
-        ];
-    }
-
-    /**
-     * Addresses missing coordinates (null or zero lat/long),
-     * business + employer sides as separate rows.
-     */
-    public function unsetLocations(?string $search = null): array
-    {
-        $entries = [];
-
-        foreach ($this->businessList() as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            foreach (['business', 'employer'] as $side) {
-                $entry = $this->unsetEntry($row, $side);
-
-                if ($entry !== null) {
-                    $entries[] = $entry;
-                }
-            }
-        }
-
-        $search = trim((string) $search);
-
-        if ($search !== '') {
-            $entries = array_values(array_filter(
-                $entries,
-                fn (array $entry): bool => stripos(
-                    implode(' ', [
-                        $entry['business_name'],
-                        $entry['street'],
-                        $entry['barangay'],
-                        $entry['city'],
-                    ]),
-                    $search
-                ) !== false,
-            ));
-        }
-
-        usort($entries, fn (array $a, array $b): int => strcmp(
-            (string) $a['business_name'].(string) $a['side'],
-            (string) $b['business_name'].(string) $b['side'],
-        ));
-
-        return $entries;
-    }
-
-    public function unsetCount(): int
-    {
-        return count($this->unsetLocations());
-    }
-
     // ── Opportunity ──────────────────────────────────────────────
 
     /**
@@ -660,7 +755,7 @@ class EconomicMapService
     protected function barangayPopulations(): array
     {
         $cacheKey = config('economic-map.cache_prefix', 'economic_map').'.barangay_populations';
-        $ttl      = $this->ttl();
+        $ttl = $this->ttl();
 
         return Cache::remember($cacheKey, $ttl, function (): array {
             try {
@@ -673,11 +768,11 @@ class EconomicMapService
                         continue;
                     }
 
-                    $juridical  = $row['juridical'] ?? [];
-                    $resolved   = $api->resolveAddress(
-                        $juridical['region']   ?? null,
+                    $juridical = $row['juridical'] ?? [];
+                    $resolved = $api->resolveAddress(
+                        $juridical['region'] ?? null,
                         $juridical['province'] ?? null,
-                        $juridical['city']     ?? null,
+                        $juridical['city'] ?? null,
                         null,
                     );
 
@@ -746,16 +841,16 @@ class EconomicMapService
      */
     public function opportunities(): array
     {
-        $groups     = $this->groupByBarangay();
+        $groups = $this->groupByBarangay();
         $populations = $this->barangayPopulations();
 
         if (empty($groups)) {
             return [
-                'ranked'             => [],
-                'barangay_count'     => 0,
-                'high_very_high'     => 0,
-                'highlights'         => [],
-                'how_calculated'     => $this->opportunityHowCalculated(),
+                'ranked' => [],
+                'barangay_count' => 0,
+                'high_very_high' => 0,
+                'highlights' => [],
+                'how_calculated' => $this->opportunityHowCalculated(),
             ];
         }
 
@@ -764,8 +859,8 @@ class EconomicMapService
         $raw = [];
 
         foreach ($groups as $key => $group) {
-            $count   = count($group['rows']);
-            $pop     = $populations[$key] ?? 0;
+            $count = count($group['rows']);
+            $pop = $populations[$key] ?? 0;
             $newRows = count(array_filter($group['rows'], fn (array $r): bool => static::isNew($r)));
 
             // Sector breakdown
@@ -780,7 +875,7 @@ class EconomicMapService
             $entropy = 0.0;
 
             foreach ($sectorCounts as $sc) {
-                $p        = $sc / $count;
+                $p = $sc / $count;
                 $entropy -= $p * log($p);
             }
 
@@ -795,17 +890,17 @@ class EconomicMapService
             $gap = ($pop > 0 && $count > 0) ? $pop / $count : 0.0;
 
             $raw[$key] = [
-                'barangay'     => $group['barangay'],
-                'lat'          => $group['lat'],
-                'lng'          => $group['lng'],
-                'count'        => $count,
-                'new'          => $newRows,
-                'population'   => $pop,
-                'density'      => $density,
-                'growth'       => $count > 0 ? $newRows / $count : 0.0,
-                'entropy'      => $entropy,
-                'ag_share'     => $count > 0 ? $agCount / $count : 0.0,
-                'gap'          => $gap,
+                'barangay' => $group['barangay'],
+                'lat' => $group['lat'],
+                'lng' => $group['lng'],
+                'count' => $count,
+                'new' => $newRows,
+                'population' => $pop,
+                'density' => $density,
+                'growth' => $count > 0 ? $newRows / $count : 0.0,
+                'entropy' => $entropy,
+                'ag_share' => $count > 0 ? $agCount / $count : 0.0,
+                'gap' => $gap,
                 'sector_counts' => $sectorCounts,
             ];
         }
@@ -813,28 +908,28 @@ class EconomicMapService
         // ── Normalise each signal 0–1 across all barangays ─────
 
         $maxDensity = max(array_column($raw, 'density') ?: [1.0]);
-        $maxGrowth  = max(array_column($raw, 'growth')  ?: [1.0]);
+        $maxGrowth = max(array_column($raw, 'growth') ?: [1.0]);
         $maxEntropy = max(array_column($raw, 'entropy') ?: [1.0]);
         $maxAgShare = max(array_column($raw, 'ag_share') ?: [1.0]);
-        $maxGap     = max(array_column($raw, 'gap')     ?: [1.0]);
+        $maxGap = max(array_column($raw, 'gap') ?: [1.0]);
 
         $scored = [];
 
         foreach ($raw as $key => $r) {
-            $nDensity = $maxDensity > 0 ? $r['density']  / $maxDensity : 0.0;
-            $nGrowth  = $maxGrowth  > 0 ? $r['growth']   / $maxGrowth  : 0.0;
-            $nEntropy = $maxEntropy > 0 ? $r['entropy']  / $maxEntropy : 0.0;
+            $nDensity = $maxDensity > 0 ? $r['density'] / $maxDensity : 0.0;
+            $nGrowth = $maxGrowth > 0 ? $r['growth'] / $maxGrowth : 0.0;
+            $nEntropy = $maxEntropy > 0 ? $r['entropy'] / $maxEntropy : 0.0;
             $nAgShare = $maxAgShare > 0 ? $r['ag_share'] / $maxAgShare : 0.0;
-            $nGap     = $maxGap     > 0 ? $r['gap']      / $maxGap     : 0.0;
+            $nGap = $maxGap > 0 ? $r['gap'] / $maxGap : 0.0;
 
             $score = ($nDensity + $nGrowth + $nEntropy + $nAgShare + $nGap) / 5.0;
 
             $scored[$key] = array_merge($r, [
-                'score'       => round($score, 4),
-                'n_density'   => round($nDensity, 4),
-                'n_growth'    => round($nGrowth, 4),
-                'n_ag'        => round($nAgShare, 4),
-                'n_gap'       => round($nGap, 4),
+                'score' => round($score, 4),
+                'n_density' => round($nDensity, 4),
+                'n_growth' => round($nGrowth, 4),
+                'n_ag' => round($nAgShare, 4),
+                'n_gap' => round($nGap, 4),
             ]);
         }
 
@@ -879,10 +974,10 @@ class EconomicMapService
         $biggestGap = reset($scored)['barangay'] ?? '—';
 
         return [
-            'ranked'         => $ranked,
+            'ranked' => $ranked,
             'barangay_count' => count($ranked),
             'high_very_high' => $highVeryHigh,
-            'highlights'     => [
+            'highlights' => [
                 ['icon' => '🏪', 'label' => 'Best commercial area',      'value' => $bestCommercial],
                 ['icon' => '📈', 'label' => 'Fastest growing area',       'value' => $fastestGrowing],
                 ['icon' => '🏝',  'label' => 'Highest tourism potential', 'value' => $highestTourism],
@@ -899,7 +994,7 @@ class EconomicMapService
             ['term' => 'Commercial Potential', 'detail' => 'MSME Concentration (SCIMS registry)'],
             ['term' => 'Growth Momentum',      'detail' => 'New Registrations'],
             ['term' => 'Tourism Potential',    'detail' => 'Sector Diversity (entropy proxy)'],
-            ['term' => 'Agriculture Potential','detail' => 'Land & Production Capacity (Agri/Fishing share)'],
+            ['term' => 'Agriculture Potential', 'detail' => 'Land & Production Capacity (Agri/Fishing share)'],
             ['term' => 'Livelihood Gap',        'detail' => 'High Population, Few Businesses'],
             ['term' => 'Population',            'detail' => 'Live from vamosmobile.app/api/addresses/barangay/'],
         ];
@@ -971,8 +1066,7 @@ class EconomicMapService
     }
 
     /**
-     * Center point for one barangay from already-geocoded siblings.
-     * Null when the barangay is blank or nothing is located there yet.
+     * Center point for one barangay.
      *
      * @return array{0: float, 1: float}|null [lat, lng]
      */
@@ -984,36 +1078,22 @@ class EconomicMapService
             return null;
         }
 
-        $lats = [];
-        $lngs = [];
+        $group = $this->groupByBarangay()[$key] ?? null;
 
-        foreach ($this->geocodedRows() as $row) {
-            if (static::normalizePlace($row['juridical']['barangay'] ?? null) !== $key) {
-                continue;
-            }
-
-            $lats[] = (float) $row['juridical']['latitude'];
-            $lngs[] = (float) $row['juridical']['longitude'];
-        }
-
-        if ($lats === []) {
-            return null;
-        }
-
-        return [array_sum($lats) / count($lats), array_sum($lngs) / count($lngs)];
+        return $group !== null ? [$group['lat'], $group['lng']] : null;
     }
 
-    /** Data bounds for fitting the map viewport. Null when nothing is plotted. */
+    /** Barangay-centre bounds for fitting the map viewport. */
     public function bounds(): ?array
     {
-        $rows = $this->geocodedRows();
+        $groups = $this->groupByBarangay();
 
-        if ($rows === []) {
+        if ($groups === []) {
             return null;
         }
 
-        $lats = array_map(fn (array $r): float => (float) $r['juridical']['latitude'], $rows);
-        $lngs = array_map(fn (array $r): float => (float) $r['juridical']['longitude'], $rows);
+        $lats = array_map(fn (array $group): float => (float) $group['lat'], $groups);
+        $lngs = array_map(fn (array $group): float => (float) $group['lng'], $groups);
 
         [$minLat, $maxLat] = [min($lats), max($lats)];
         [$minLng, $maxLng] = [min($lngs), max($lngs)];

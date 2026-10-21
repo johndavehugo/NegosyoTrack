@@ -61,7 +61,6 @@ class RiskMap extends BaseMapPage
         $this->calamities = $risk['calamities'];
         $this->bounds = $service->bounds();
         $this->hasData = $this->assessed > 0;
-        $this->loadUnsetCount();
     }
 
     public function updatedSelectedCalamity(): void

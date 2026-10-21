@@ -10,12 +10,10 @@
 
     @if (! $hasData)
         <div class="rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-900">
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">No geocoded businesses yet</p>
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">No business data yet</p>
             <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-                Hotspot circles need real coordinates. Every record is currently missing lat/long —
-                set them in
-                <a href="{{ \App\Filament\Pages\EconomicMap\BusinessLocations::getUrl() }}" class="font-medium text-blue-700 hover:underline">Business Locations</a>
-                and the map will populate. Nothing is plotted from guesses.
+                The SCIMS registry snapshot is empty. Run
+                <span class="font-mono">php artisan economic-map:sync</span> or wait for the scheduled sync, then refresh this page.
             </p>
         </div>
     @else
@@ -79,15 +77,15 @@
 
                 <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Registered MSME Locations</h3>
+                        <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Individual MSME Locations</h3>
                         <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-white/10">{{ count($pins) > 0 ? count($pins) : 'None' }}</span>
                     </div>
                     @if ($summary && count($pins) > 0)
-                        <p class="mt-2 text-xs text-gray-500">{{ $summary['barangay'] }} · {{ number_format(count($pins)) }} registered MSMEs shown · local registry</p>
+                        <p class="mt-2 text-xs text-gray-500">{{ $summary['barangay'] }} · {{ number_format(count($pins)) }} registered MSMEs shown · SCIMS registry</p>
                     @else
                         <p class="mt-2 text-xs text-gray-500">Select a hotspot or barangay ranking to load its registered MSMEs.</p>
                     @endif
-                    <p class="mt-1 text-xs text-gray-400">Pins use registry address records with real GPS coordinates.</p>
+                    <p class="mt-1 text-xs text-gray-400">Pins require real GPS coordinates from SCIMS. Barangay totals include every registered business.</p>
                     @if (count($pins) > 0)
                         <button type="button" wire:click="clearSelection" class="mt-2 rounded-lg px-3 py-1.5 text-xs ring-1 ring-gray-300 hover:bg-gray-50 dark:ring-white/10">✕ Clear locations</button>
                     @endif
@@ -124,7 +122,7 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Hotspots reflect the number of registered MSMEs per barangay from the local registry. Larger, darker circles indicate higher business concentration. Select a hotspot circle or barangay ranking to view individual registered MSME locations.',
+        'slot' => 'Hotspots reflect the number of registered MSMEs per barangay from the SCIMS registry. Barangays without GPS coordinates are plotted at their approximate centre. Larger, darker circles indicate higher business concentration. Select a hotspot circle or barangay ranking to view individual business details.',
     ])
 
     <script type="module">
