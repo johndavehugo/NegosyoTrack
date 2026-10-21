@@ -1,6 +1,5 @@
 <x-filament-panels::page>
     <div class="grid grid-cols-12 gap-6">
-
         @if ($section === 'menu')
             {{-- Left column --}}
             <div class="col-span-12 lg:col-span-3">
@@ -15,35 +14,35 @@
 
                     {{-- Name --}}
                     <h2 class="mt-4 text-center text-lg font-semibold">
-                        {{ $this->record->employer->full_name }}
+                        {{ $business['juri_name'] }}
                     </h2>
 
                     {{-- Entity number --}}
                     <p class="text-center text-sm text-gray-500">
-                        Entity #{{ $this->record->entity_no }}
+                        Entity #{{ $business['entity_no'] }}
                     </p>
 
                     {{-- Information --}}
                     <div class="mt-6 divide-y divide-gray-200 dark:divide-gray-700">
 
                         <div class="flex justify-between py-2 text-sm">
-                            <span class="font-medium">Birthdate</span>
-                            <span class="text-gray-500">{{ $this->record->employer->birth_date }}</span>
+                            <span class="font-medium">BIN</span>
+                            <span class="text-gray-500">{{ $business['bin_etracs'] }}</span>
                         </div>
 
                         <div class="flex justify-between py-2 text-sm">
-                            <span class="font-medium">Gender</span>
-                            <span class="text-gray-500">{{ $this->record->employer->gender }}</span>
+                            <span class="font-medium">Status</span>
+                            <span class="text-gray-500">{{ $business['status'] }}</span>
                         </div>
 
                         <div class="flex justify-between py-2 text-sm">
-                            <span class="font-medium">Mobile No.</span>
-                            <span class="text-gray-500">{{ $this->record->employer->contact_no }}</span>
+                            <span class="font-medium">Owner</span>
+                            <span class="text-gray-500 text-right break-words min-w-[50%] flex-1">{{ $business['owner_fullname'] }}</span>
                         </div>
 
                         <div class="flex justify-between py-2 text-sm">
-                            <span class="font-medium">Email</span>
-                            <span class="text-gray-500">{{ $this->record->employer->email }}</span>
+                            <span class="font-medium">Employer</span>
+                            <span class="text-gray-500 text-right break-words min-w-[50%] flex-1">{{ $business['employer_fullname'] }}</span>
                         </div>
 
                     </div>
@@ -61,31 +60,29 @@
                     </div>
 
                     <p class="mt-3 text-sm text-gray-500">
-                        {{ $this->record->employer->address->full_address }}
+                        {{ $business['full_business_address'] }}
                     </p>
 
                 </div>
             </div>
-
         @endif
 
         {{-- Right column --}}
         <div class="{{ $section === 'menu' ? 'col-span-12 lg:col-span-9' : 'col-span-12' }}">
 
             @if ($section === 'menu')
-
                     <div
                         class="overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
 
                         {{-- Menu item --}}
-                        <button type="button" wire:click="showSection('personal')"
+                        <button type="button" wire:click="showSection('owner')"
                             class="flex w-full items-center justify-between border-b border-gray-200 px-5 py-4 text-left transition hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-white/5">
                             <span class="flex items-center gap-3">
 
                                 <x-heroicon-o-user class="h-5 w-5 text-gray-500" />
 
                                 <span class="text-sm font-medium">
-                                    Personal Information
+                                    Owner Information
                                 </span>
 
                             </span>
@@ -112,14 +109,14 @@
                         </button>
 
                         {{-- Menu item --}}
-                        <button type="button" wire:click="showSection('address')"
+                        <button type="button" wire:click="showSection('employees')"
                             class="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-gray-50 dark:hover:bg-white/5">
                             <span class="flex items-center gap-3">
 
-                                <x-heroicon-o-map-pin class="h-5 w-5 text-gray-500" />
+                                <x-heroicon-o-briefcase class="h-5 w-5 text-gray-500" />
 
                                 <span class="text-sm font-medium">
-                                    Address
+                                    Employees
                                 </span>
 
                             </span>
@@ -132,21 +129,19 @@
 
                 </div>
 
-            @elseif ($section === 'personal')
+            @elseif ($section === 'owner')
             <div class="msme-form">
-                {{ $this->personalForm }}
+                {{ $this->ownerForm }}
             </div>
 
         @elseif ($section === 'business')
             <div class="msme-form">
                 {{ $this->businessForm }}
             </div>
-        @elseif ($section === 'address')
+        @elseif ($section === 'employees')
             <div class="msme-form">
-                {{ $this->addressForm }}
             </div>
 
         @endif
-
     </div>
 </x-filament-panels::page>
