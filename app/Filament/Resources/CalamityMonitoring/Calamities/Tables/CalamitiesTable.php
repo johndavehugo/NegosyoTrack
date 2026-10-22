@@ -8,9 +8,11 @@ use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Filament\Support\Colors\Color;
 
 class CalamitiesTable
 {
@@ -42,7 +44,9 @@ class CalamitiesTable
                 Action::make('manage-incidents')
                     ->url(fn (Calamity $record): string => CalamityResource::getUrl('manage-incidents', [
                         'record' => $record->id,
-                    ])),
+                    ]))
+                ->color(Color::Blue)
+                ->icon(Heroicon::DocumentText),
             ]);
         // ->toolbarActions([
         //     BulkActionGroup::make([

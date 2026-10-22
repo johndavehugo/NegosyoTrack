@@ -2,7 +2,7 @@
 
 namespace App\Filament\Resources\PriceMonitoring\PriceLists\Widgets;
 
-use App\Models\PriceMonitoring\Commodity;
+use App\Models\PriceMonitoring\CommodityVariant;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
@@ -13,18 +13,18 @@ class PriceListOverview extends StatsOverviewWidget
     protected function getStats(): array
     {
         return [
-            Stat::make('', Commodity::count())
+            Stat::make('', CommodityVariant::count())
                 ->description('Monitored Items')
                 ->descriptionIcon(Heroicon::ArchiveBox)
                 ->color(Color::Blue),
 
-            Stat::make('', Commodity::where('is_active', 1)->count())
-                ->description('Active Items')
+            Stat::make('', CommodityVariant::whereNotNull('prevailing_price')->count())
+                ->description('Has Prevailing Price')
                 ->descriptionIcon(Heroicon::CheckBadge)
                 ->color(Color::Green),
 
-            Stat::make('', Commodity::where('is_active', 0)->count())
-                ->description('Inactive Items')
+            Stat::make('', CommodityVariant::whereNull('prevailing_price')->count())
+                ->description('Missing Prevailing Price')
                 ->descriptionIcon(Heroicon::XCircle)
                 ->color(Color::Red),
         ];

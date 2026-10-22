@@ -4,7 +4,11 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
+<<<<<<< HEAD
     "content-hash": "0eff50b7a4065232c5010fb538f67fc2",
+=======
+    "content-hash": "d9e10d28cb7fcb56a788328e75224944",
+>>>>>>> df62f001a3065ad8f6b20b54636559892424e680
     "packages": [
         {
             "name": "anourvalar/eloquent-serialize",
@@ -3397,6 +3401,7 @@
         },
         {
             "name": "leandrocfe/filament-apex-charts",
+<<<<<<< HEAD
             "version": "5.1.0",
             "source": {
                 "type": "git",
@@ -3407,6 +3412,18 @@
                 "type": "zip",
                 "url": "https://api.github.com/repos/leandrocfe/filament-apex-charts/zipball/20f08492ff72216e329c70c5096c966649fc8350",
                 "reference": "20f08492ff72216e329c70c5096c966649fc8350",
+=======
+            "version": "5.1.4",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/leandrocfe/filament-apex-charts.git",
+                "reference": "19c6f01b66c7b36ba7f8d9851f1d3f00bda0b65c"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/leandrocfe/filament-apex-charts/zipball/19c6f01b66c7b36ba7f8d9851f1d3f00bda0b65c",
+                "reference": "19c6f01b66c7b36ba7f8d9851f1d3f00bda0b65c",
+>>>>>>> df62f001a3065ad8f6b20b54636559892424e680
                 "shasum": ""
             },
             "require": {
@@ -3422,7 +3439,11 @@
                 "larastan/larastan": "^3.0.1",
                 "laravel/pint": "^1.0",
                 "nunomaduro/collision": "^8.0",
+<<<<<<< HEAD
                 "orchestra/testbench": "^9.0",
+=======
+                "orchestra/testbench": "^9.0|^10.0|^11.0",
+>>>>>>> df62f001a3065ad8f6b20b54636559892424e680
                 "pestphp/pest": "^3.0",
                 "pestphp/pest-plugin-laravel": "^3.0",
                 "phpstan/extension-installer": "^1.1",
@@ -3467,9 +3488,15 @@
             ],
             "support": {
                 "issues": "https://github.com/leandrocfe/filament-apex-charts/issues",
+<<<<<<< HEAD
                 "source": "https://github.com/leandrocfe/filament-apex-charts/tree/5.1.0"
             },
             "time": "2026-03-26T18:38:39+00:00"
+=======
+                "source": "https://github.com/leandrocfe/filament-apex-charts/tree/5.1.4"
+            },
+            "time": "2026-08-30T09:43:26+00:00"
+>>>>>>> df62f001a3065ad8f6b20b54636559892424e680
         },
         {
             "name": "livewire/livewire",

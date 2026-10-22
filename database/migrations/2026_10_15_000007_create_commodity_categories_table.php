@@ -11,13 +11,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('agencies', function (Blueprint $table) {
+        Schema::create('commodity_categories', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
             $table->id();
-            $table->string('code', 20)->unique('code');
-            $table->string('name', 150);
-            $table->string('coverage', 255)->nullable();
+            $table->unsignedBigInteger('agency_id');
+            $table->string('name', 100);
             $table->timestamp('created_at')->useCurrent();
-            $table->timestamp('updated_at')->useCurrent();
+            $table->timestamp('updated_at')->nullable();
+            $table->index('agency_id', 'fk_category_agency');
         });
     }
 
@@ -26,6 +28,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('agencies');
+        Schema::dropIfExists('commodity_categories');
     }
 };

@@ -12,6 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('calamity_incidents', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_general_ci';
             $table->id();
             $table->string('juridical_id', 100);
             $table->unsignedBigInteger('calamity_id');

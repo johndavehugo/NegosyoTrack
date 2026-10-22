@@ -11,13 +11,12 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('calamities', function (Blueprint $table) {
+        Schema::create('commodity_brands', function (Blueprint $table) {
+            $table->charset = 'utf8mb4';
+            $table->collation = 'utf8mb4_unicode_ci';
             $table->id();
-            $table->string('name', 150);
-            $table->string('calamity_type', 50);
-            $table->date('declaration_date');
-            $table->text('description')->nullable();
-            $table->timestamp('created_at')->useCurrent();
+            $table->string('name', 100)->unique('brands_name_unique');
+            $table->timestamp('created_at')->nullable();
             $table->timestamp('updated_at')->nullable();
         });
     }
@@ -27,6 +26,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('calamities');
+        Schema::dropIfExists('commodity_brands');
     }
 };

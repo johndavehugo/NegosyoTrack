@@ -1,36 +1,218 @@
 <x-filament-panels::page>
-    @include('filament.pages.economic-map.partials.controls')
+    <link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}">
 
-    <div class="mb-4 max-w-xl">
-        @include('filament.pages.economic-map.partials.search-bar')
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="w-full max-w-xl">
+            @include('filament.pages.economic-map.partials.search-bar')
+        </div>
+        @include('filament.pages.economic-map.partials.unset-pill')
     </div>
 
     @include('filament.pages.economic-map.partials.map-tabs', ['active' => 'risk'])
 
-    <div class="mb-4 grid grid-cols-1 gap-3 text-center sm:grid-cols-3">
-        <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="text-2xl font-bold">{{ number_format($calamityCount) }}</div>
-            <div class="text-xs text-gray-500">Calamity events tracked</div>
+    @if (! $hasData)
+        <div class="rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-900">
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">No geocoded businesses yet</p>
+            <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                Risk scoring needs business locations to compute exposure. Set them in
+                <a href="{{ \App\Filament\Pages\EconomicMap\BusinessLocations::getUrl() }}" class="font-medium text-blue-700 hover:underline">Business Locations</a>.
+            </p>
         </div>
-        <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="text-2xl font-bold">₱{{ number_format($totalDamage, 2) }}</div>
-            <div class="text-xs text-gray-500">Recorded damages</div>
-        </div>
-        <div class="rounded-xl bg-white p-4 shadow-sm ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10">
-            <div class="text-2xl font-bold">{{ number_format($totalAffected) }}</div>
-            <div class="text-xs text-gray-500">Businesses affected</div>
-        </div>
-    </div>
+    @else
+        <div class="grid grid-cols-12 gap-4">
+            {{-- Left sidebar --}}
+            <div class="col-span-12 space-y-4 md:col-span-4 lg:col-span-3">
+                @include('filament.pages.economic-map.partials.stat-card', [
+                    'label' => 'Critical Risk Areas',
+                    'value' => number_format($levels['Critical'] ?? 0),
+                    'color' => '#dc3545',
+                ])
 
-    @include('filament.pages.economic-map.partials.wip', [
-        'message' => 'The legacy risk score multiplies business exposure by LGU hazard ratings — and those ratings currently exist only as hardcoded guesses, which we refuse to ship. The map stays parked until hazard levels have a real source (e.g. a DRRM module).',
-        'waitingOn' => [
-            'Barangay hazard ratings from an authoritative source (replaces the legacy hardcoded Critical/High/Moderate table)',
-            'Decision on whether the calamity monitoring module API becomes the damage feed (tables are already live underneath)',
-        ],
-        'ready' => [
-            $calamityCount.' calamity events with ₱'.number_format($totalDamage, 2).' in recorded damages, readable today via CalamityFeed',
-            'Business exposure per barangay (same counts as the Hotspot tab)',
-        ],
+                @include('filament.pages.economic-map.partials.stat-card', [
+                    'label' => 'High Risk Areas',
+                    'value' => number_format($levels['High'] ?? 0),
+                    'color' => '#fd7e14',
+                ])
+
+                @include('filament.pages.economic-map.partials.stat-card', [
+                    'label' => 'Barangays Assessed',
+                    'value' => number_format($assessed),
+                    'color' => '#343a40',
+                ])
+
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Calamity Event</p>
+                    <select
+                        wire:model.live="selectedCalamity"
+                        class="emap-select mt-1 w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-3 text-sm font-medium shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-gray-900 dark:focus:ring-blue-500/20"
+                    >
+                        <option value="">All events</option>
+                        @foreach ($calamities as $calamity)
+                            <option value="{{ $calamity['id'] }}">{{ $calamity['name'] }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-gray-400">Risk is recomputed using the historical damage of the selected event (from Calamity Monitoring).</p>
+                    @if ($this->selectedCalamityName())
+                        <p class="mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">Showing: {{ $this->selectedCalamityName() }}</p>
+                    @endif
+                </div>
+
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-400">How it's calculated</p>
+                    <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">Economic Risk = Business Exposure × Historical Damage</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Exposure</span> — number of MSMEs in the area (local registry)</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Damage</span> — prior losses recorded in Calamity Monitoring</li>
+                    </ul>
+                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Areas with high MSME concentration and a history of losses score highest — pinpointing where a disaster would cause the greatest economic disruption.</p>
+                </div>
+
+                @include('filament.pages.economic-map.partials.summary-card')
+            </div>
+
+            {{-- Map panel --}}
+            <div class="col-span-12 md:col-span-8 md:flex md:flex-col lg:col-span-9">
+                <div class="overflow-hidden rounded-lg shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
+                    <div class="flex h-10 shrink-0 items-center gap-2 bg-[#1e2a78] px-4">
+                        <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🛡 Economic Risk Map — Linked to Calamity Monitoring</p>
+                        <span class="shrink-0 rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-[#1e2a78]">₱{{ number_format($totalDamage, 2) }} recorded</span>
+                    </div>
+                    <div class="relative md:min-h-0 md:flex-1">
+                        <div id="risk-map" wire:ignore class="h-[60vh] w-full md:h-full"></div>
+                        <div class="absolute bottom-10 right-3 rounded-lg bg-white/95 p-3 text-xs shadow-lg dark:bg-gray-900/95">
+                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk</p>
+                            @foreach (config('economic-map.risk_bands', []) as $band)
+                                <div class="flex items-center gap-2 py-0.5 text-gray-600 dark:text-gray-300">
+                                    <span class="h-2.5 w-2.5 rounded-full" style="background: {{ $band['color'] }};"></span>
+                                    {{ $band['label'] }}
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    @include('filament.pages.economic-map.partials.info-bar', [
+        'slot' => 'Risk levels — Critical, High, Moderate, Low. Click a circle for the full risk breakdown.',
     ])
+
+    <script type="module">
+        import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
+
+        const barangays = @js($barangays);
+        const bounds = @js($bounds);
+        const basemap = @js(config('economic-map.basemap'));
+        const el = document.getElementById('risk-map');
+
+        const norm = (e) => e?.detail?.[0] ?? e?.detail ?? {};
+        let map = null;
+        let popup = null;
+
+        const radius = (score) => 9 + 12 * Math.sqrt(Math.max(score, 0));
+        const money = (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        function boot() {
+            if (! el || map) return;
+
+            // The theme <link> lives in the page body, so the container may
+            // still be 0px tall when this module runs. Wait for real size —
+            // MapLibre initialised at 0x0 stays blank forever.
+            if (el.clientHeight === 0) {
+                let waits = 0;
+                const timer = setInterval(() => {
+                    if (el.clientHeight > 0 || ++waits > 100) {
+                        clearInterval(timer);
+                        if (el.clientHeight > 0) boot();
+                        else el.innerHTML = '<p class="p-8 text-center text-sm text-gray-500">Map failed to initialise (no render size). Reload the page.</p>';
+                    }
+                }, 50);
+                return;
+            }
+
+            map = new maplibregl.Map({ container: el, style: { version: 8, sources: {}, layers: [] }, center: [0, 0], zoom: 2 });
+            map.addControl(new maplibregl.NavigationControl(), 'top-left');
+            map.addControl(new maplibregl.ScaleControl({ position: 'bottom-right' }));
+
+            map.on('load', () => {
+                map.resize();
+                map.addSource('osm', { type: 'raster', tiles: basemap.tiles, tileSize: basemap.tile_size, attribution: basemap.attribution, maxzoom: basemap.max_zoom });
+                map.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
+
+                map.addSource('circles', {
+                    type: 'geojson',
+                    data: {
+                        type: 'FeatureCollection',
+                        features: barangays.map((b) => ({
+                            type: 'Feature',
+                            properties: {
+                                barangay: b.barangay, score: b.score, color: b.color, level: b.level,
+                                radius: radius(b.score), count: b.business_count,
+                                exposure: b.exposure, affected: b.affected_count, damage: b.total_damage,
+                            },
+                            geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
+                        })),
+                    },
+                });
+                map.addLayer({
+                    id: 'circles', type: 'circle', source: 'circles',
+                    paint: {
+                        'circle-radius': ['get', 'radius'],
+                        'circle-color': ['get', 'color'],
+                        'circle-opacity': 0.65,
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#ffffff',
+                    },
+                });
+
+                map.on('click', 'circles', (e) => {
+                    const p = e.features?.[0]?.properties;
+                    if (! p) return;
+
+                    if (! popup) popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px' });
+
+                    popup.setLngLat(e.lngLat).setHTML(
+                        `<div style="font-size:12px;line-height:1.5;min-width:180px;">` +
+                        `<p style="font-weight:700;font-size:13px;">${p.barangay}</p>` +
+                        `<p><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${p.color};margin-right:4px;"></span><strong>${p.level}</strong> · score ${p.score}</p>` +
+                        `<p>Businesses: <strong>${p.count}</strong> (${(p.exposure * 100).toFixed(1)}% exposure)</p>` +
+                        `<p>Affected before: <strong>${p.affected}</strong></p>` +
+                        `<p>Damage recorded: <strong>${money(p.damage)}</strong></p>` +
+                        `</div>`
+                    ).addTo(map);
+
+                    map.flyTo({ center: e.lngLat, zoom: 14 });
+
+                    if (window.Livewire) window.Livewire.dispatch('emap-select-barangay', { barangay: p.barangay });
+                });
+                map.on('mouseenter', 'circles', () => (map.getCanvas().style.cursor = 'pointer'));
+                map.on('mouseleave', 'circles', () => (map.getCanvas().style.cursor = ''));
+
+                if (bounds) map.fitBounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]], { padding: 40 });
+            });
+        }
+
+        window.addEventListener('emap-focus', (e) => {
+            const d = norm(e);
+            const found = barangays.find((b) => b.barangay === d.barangay);
+            if (map && found) map.flyTo({ center: [found.lng, found.lat], zoom: 14 });
+        });
+
+        window.addEventListener('emap-focus-street', (e) => {
+            const d = norm(e);
+            if (map && d.lat && d.lng) map.flyTo({ center: [d.lng, d.lat], zoom: 16 });
+        });
+
+        window.addEventListener('emap-data-refreshed', () => window.location.reload());
+        document.addEventListener('livewire:navigated', () => boot());
+
+        let resizeTimer;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => map && map.resize(), 200);
+        });
+
+        boot();
+    </script>
 </x-filament-panels::page>
