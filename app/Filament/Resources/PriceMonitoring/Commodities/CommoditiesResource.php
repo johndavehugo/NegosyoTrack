@@ -4,10 +4,8 @@ namespace App\Filament\Resources\PriceMonitoring\Commodities;
 
 use App\Filament\Resources\PriceMonitoring\Commodities\Pages\ManageCommodities;
 use App\Models\PriceMonitoring\Commodity;
+use App\Services\PriceMonitoringService;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -56,9 +54,15 @@ class CommoditiesResource extends Resource
 
                 Select::make('juridical_id')
                     ->label('Establishment')
-                    ->relationship('juridical', 'name')
                     ->searchable()
-                    ->preload(),
+                    ->nullable()
+                    ->placeholder('Select an establishment')
+                    ->getSearchResultsUsing(
+                        fn (string $search): array => app(PriceMonitoringService::class)->searchEstablishments($search)
+                    )
+                    ->getOptionLabelUsing(
+                        fn (?string $value): ?string => app(PriceMonitoringService::class)->resolveEstablishmentName($value)
+                    ),
 
                 Repeater::make('variants')
                     ->relationship('variants')
@@ -97,10 +101,16 @@ class CommoditiesResource extends Resource
                 TextColumn::make('category.name')
                     ->sortable()
                     ->label('Category'),
-                TextColumn::make('juridical.name')
+                TextColumn::make('juridical_id')
                     ->label('Establishment')
-                    ->toggleable()
-                    ->sortable(),
+                    ->formatStateUsing(function (?string $state): string {
+                        if (blank($state)) {
+                            return '—';
+                        }
+                        return app(PriceMonitoringService::class)->resolveEstablishmentName($state) ?? $state;
+                    })
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('variants_count')
                     ->counts('variants')
                     ->label('Variants'),

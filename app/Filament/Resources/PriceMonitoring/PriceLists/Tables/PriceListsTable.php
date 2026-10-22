@@ -5,6 +5,7 @@ namespace App\Filament\Resources\PriceMonitoring\PriceLists\Tables;
 use App\Models\PriceMonitoring\Agency;
 use App\Models\PriceMonitoring\Category;
 use App\Models\PriceMonitoring\CommodityVariant;
+use App\Services\PriceMonitoringService;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Support\Colors\Color;
@@ -37,6 +38,16 @@ class PriceListsTable
                 TextColumn::make('commodity.category.agency.name')
                     ->sortable()
                     ->label('Agency'),
+                TextColumn::make('commodity.juridical_id')
+                    ->label('Establishment')
+                    ->formatStateUsing(function (?string $state): string {
+                        if (blank($state)) {
+                            return '—';
+                        }
+                        return app(PriceMonitoringService::class)->resolveEstablishmentName($state) ?? $state;
+                    })
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('srp')
                     ->label('SRP')
                     ->numeric(decimalPlaces: 2)
