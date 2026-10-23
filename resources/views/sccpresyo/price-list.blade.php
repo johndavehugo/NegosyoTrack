@@ -63,20 +63,6 @@
 
             <div class="w-px h-6 bg-slate-200 shrink-0 hidden sm:block"></div>
 
-            {{-- Desktop search — submits the filter form --}}
-            <div class="hidden sm:flex flex-1 max-w-md relative">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
-                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                </svg>
-                <input id="header-search" type="search"
-                       value="{{ $search }}"
-                       placeholder="Search commodity…"
-                       class="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 bg-slate-50
-                              focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
-                              placeholder-slate-400 transition-all"/>
-            </div>
-
             <div class="ml-auto flex items-center gap-2">
                 {{-- Date --}}
                 <span class="hidden md:block text-xs text-slate-400">{{ now()->format('M j, Y') }}</span>
@@ -306,84 +292,96 @@
 
         {{-- Filter form --}}
         <form method="GET" action="{{ route('sccpresyo.index') }}" id="filter-form">
-            {{-- Search is part of the form so it submits properly --}}
-            <div class="flex flex-wrap items-end gap-3 mb-3">
-                <div class="flex-1 min-w-[220px]">
-                    <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Search</label>
-                    <div class="relative">
-                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
-                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-                        </svg>
-                        <input id="main-search" type="search" name="search"
-                               value="{{ $search }}"
-                               placeholder="Search commodity…"
-                               class="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-white
-                                      focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
-                                      placeholder-slate-400 shadow-sm"/>
-                    </div>
-                </div>
-                <div class="min-w-[170px]">
-                    <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Category</label>
-                    <select name="category" onchange="this.form.submit()"
-                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700
-                               shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
-                               appearance-none cursor-pointer font-medium">
-                        <option value="">All Categories</option>
-                        @foreach ($categories as $cat)
-                            <option value="{{ $cat->id }}" @selected($categoryId == $cat->id)>
-                                {{ $cat->name }} ({{ $cat->commodities_count }})
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="min-w-[160px]">
-                    <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Sort By</label>
-                    <select name="sort" onchange="this.form.submit()"
-                        class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700
-                               shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
-                               appearance-none cursor-pointer font-medium">
-                        <option value="name_asc"  @selected($sort === 'name_asc') >Name A → Z</option>
-                        <option value="name_desc" @selected($sort === 'name_desc')>Name Z → A</option>
-                        <option value="srp_asc"   @selected($sort === 'srp_asc')  >Price: Low → High</option>
-                        <option value="srp_desc"  @selected($sort === 'srp_desc') >Price: High → Low</option>
-                        <option value="cat_asc"   @selected($sort === 'cat_asc')  >By Category</option>
-                    </select>
-                </div>
+            {{-- Search row --}}
+            <div class="relative mb-4">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <input id="main-search" type="text" name="search"
+                       value="{{ $search }}"
+                       placeholder="Search commodity…"
+                       autocomplete="off"
+                       class="w-full pl-9 pr-9 py-2.5 text-sm rounded-xl border border-slate-200 bg-white
+                              focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+                              placeholder-slate-400 shadow-sm"/>
+                {{-- Clear button — shown only when there is text --}}
+                <button id="search-clear-btn" type="button"
+                    class="{{ filled($search) ? 'flex' : 'hidden' }} absolute right-3 top-1/2 -translate-y-1/2
+                           items-center justify-center w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300
+                           text-slate-500 hover:text-slate-700 transition-colors"
+                    aria-label="Clear search">
+                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Tabs + dropdowns row --}}
+            <div class="flex flex-wrap items-center gap-2">
+
+                {{-- All Commodities tab --}}
+                <button id="tab-all" type="button"
+                    class="tab-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
+                           transition-all duration-200 bg-brand text-white shadow-sm shrink-0">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                    </svg>
+                    All Commodities
+                </button>
+
+                <div class="w-px h-6 bg-slate-200 shrink-0"></div>
+
+                {{-- Category dropdown --}}
+                <select name="category" onchange="this.form.submit()"
+                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
+                           shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+                           appearance-none cursor-pointer font-medium">
+                    <option value="">All Categories</option>
+                    @foreach ($categories as $cat)
+                        <option value="{{ $cat->id }}" @selected($categoryId == $cat->id)>
+                            {{ $cat->name }} ({{ $cat->commodities_count }})
+                        </option>
+                    @endforeach
+                </select>
+
+                {{-- Sort dropdown --}}
+                <select name="sort" onchange="this.form.submit()"
+                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
+                           shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+                           appearance-none cursor-pointer font-medium">
+                    <option value="name_asc"  @selected($sort === 'name_asc') >Name A → Z</option>
+                    <option value="name_desc" @selected($sort === 'name_desc')>Name Z → A</option>
+                    <option value="srp_asc"   @selected($sort === 'srp_asc')  >Price: Low → High</option>
+                    <option value="srp_desc"  @selected($sort === 'srp_desc') >Price: High → Low</option>
+                    <option value="cat_asc"   @selected($sort === 'cat_asc')  >By Category</option>
+                </select>
 
                 @if (filled($search) || filled($categoryId) || filled($agencyId))
                     <a href="{{ route('sccpresyo.index') }}"
-                        class="self-end inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5
+                        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2
                                text-sm font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700
-                               transition-all bg-white shadow-sm">
+                               transition-all bg-white shadow-sm"
+                        style="text-decoration:none">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                         Clear
                     </a>
                 @endif
+
+                {{-- Result count pill --}}
+                <div class="ml-auto flex items-center gap-2 border border-slate-200 rounded-full px-3.5 py-1.5 bg-slate-50 shrink-0">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    <span class="text-xs font-bold text-slate-700">{{ number_format($variants->total()) }}</span>
+                    <span class="text-xs text-slate-400">{{ Str::plural('item', $variants->total()) }}</span>
+                </div>
+
             </div>
         </form>
-
-        {{-- Tabs + result count --}}
-        <div class="flex flex-wrap items-center gap-2 mt-5">
-            <button id="tab-all"
-                class="tab-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
-                       transition-all duration-200 bg-brand text-white shadow-sm">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                </svg>
-                All Commodities
-            </button>
-            <div class="ml-auto flex items-center gap-2 border border-slate-200 rounded-full px-3.5 py-1.5 bg-slate-50">
-                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                </svg>
-                <span class="text-xs font-bold text-slate-700">{{ number_format($variants->total()) }}</span>
-                <span class="text-xs text-slate-400">{{ Str::plural('item', $variants->total()) }}</span>
-            </div>
-        </div>
 
     </div>
 </div>
@@ -1034,8 +1032,6 @@
     const watchlistBtn   = document.getElementById('watchlist-toggle-btn');
     const countBadge     = document.getElementById('watchlist-count');
     const watchlistEmpty = document.getElementById('watchlist-empty');
-    const headerSearch   = document.getElementById('header-search');
-    const mobileSearch   = document.getElementById('mobile-search');
     const drawer         = document.getElementById('watchlist-drawer');
     const drawerOverlay  = document.getElementById('drawer-overlay');
     const drawerClose    = document.getElementById('drawer-close');
@@ -1481,7 +1477,7 @@
     // ══════════════════════════════════════════════════════════════
 
     function applyTabAndSearch() {
-        const query = ((headerSearch?.value || '') || (document.getElementById('main-search')?.value || '')).toLowerCase().trim();
+        const query = (document.getElementById('main-search')?.value || '').toLowerCase().trim();
         let visible = 0;
         allCards.forEach(card => {
             const show = (activeTab === 'all' || watchlist.has(card.dataset.id))
@@ -1521,37 +1517,29 @@
     tabAll?.addEventListener('click', () => setActiveTab('all'));
     tabWatchlist?.addEventListener('click', () => setActiveTab('watchlist'));
 
-    let searchTimer;
-    function onSearch(e) {
-        clearTimeout(searchTimer);
-        // Keep header search and main form search in sync
-        const val = e.target.value;
-        if (headerSearch) headerSearch.value = val;
-        const mainSearch = document.getElementById('main-search');
-        if (mainSearch) mainSearch.value = val;
-        searchTimer = setTimeout(applyTabAndSearch, 160);
-    }
-    headerSearch?.addEventListener('input', onSearch);
-
-    // Submit the filter form when user presses Enter in the header search
-    headerSearch?.addEventListener('keydown', e => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const mainSearch = document.getElementById('main-search');
-            if (mainSearch) mainSearch.value = headerSearch.value;
-            document.getElementById('filter-form')?.submit();
-        }
-    });
-
-    // main-search inside the form — debounced auto-submit + sync header search
-    const mainSearchEl = document.getElementById('main-search');
+    // main-search — debounced auto-submit on typing
+    const mainSearchEl  = document.getElementById('main-search');
+    const searchClearBtn = document.getElementById('search-clear-btn');
     let mainSearchTimer;
-    mainSearchEl?.addEventListener('input', e => {
-        if (headerSearch) headerSearch.value = e.target.value;
+
+    mainSearchEl?.addEventListener('input', () => {
+        // Show/hide the ✕ button based on whether there's text
+        const hasValue = mainSearchEl.value.length > 0;
+        searchClearBtn?.classList.toggle('hidden', !hasValue);
+        searchClearBtn?.classList.toggle('flex',    hasValue);
+
         clearTimeout(mainSearchTimer);
         mainSearchTimer = setTimeout(() => {
             document.getElementById('filter-form')?.submit();
         }, 500);
+    });
+
+    // ✕ button — clear input and immediately submit
+    searchClearBtn?.addEventListener('click', () => {
+        if (mainSearchEl) mainSearchEl.value = '';
+        searchClearBtn.classList.add('hidden');
+        searchClearBtn.classList.remove('flex');
+        document.getElementById('filter-form')?.submit();
     });
 
     // Keyboard: Escape closes modals
@@ -1776,10 +1764,10 @@
     sidebarOverlay?.addEventListener('click', e => { if (e.target === sidebarOverlay) closeSidebar(); });
 
     // Sidebar → My Favorites → open favorites modal
-    sidebarFavBtn?.addEventListener('click', () => { closeSidebar(); openFavoritesModal(); })
+    sidebarFavBtn?.addEventListener('click', () => { openFavoritesModal(); })
 
-    sidebarSrpBtn?.addEventListener('click',  () => { closeSidebar(); openSrpModal(); });
-    sidebarDiscBtn?.addEventListener('click', () => { closeSidebar(); openDisclaimerModal(); });
+    sidebarSrpBtn?.addEventListener('click',  () => { openSrpModal(); });
+    sidebarDiscBtn?.addEventListener('click', () => { openDisclaimerModal(); });
 
     // Accordion: Categories
     catToggle?.addEventListener('click', () => {
