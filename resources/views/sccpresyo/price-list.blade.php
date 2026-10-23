@@ -51,12 +51,9 @@
             <a href="{{ route('sccpresyo.index') }}"
                class="flex items-center gap-2.5 shrink-0 group"
                style="text-decoration:none">
-                <div class="w-9 h-9 bg-brand rounded-xl flex items-center justify-center shadow-sm group-hover:bg-brand-dark transition-colors">
-                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="2"
-                         stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                        <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                        <line x1="7" y1="7" x2="7.01" y2="7"/>
-                    </svg>
+                <div class="w-9 h-9 rounded-xl overflow-hidden shadow-sm shrink-0">
+                    <img src="{{ asset('images/scclogo.png') }}" alt="San Carlos City Logo"
+                         class="w-full h-full object-cover"/>
                 </div>
                 <div class="leading-tight">
                     <p class="text-sm font-black text-slate-900 tracking-tight">SCCPresyo</p>
@@ -89,21 +86,6 @@
 
                 {{-- Date --}}
                 <span class="hidden md:block text-xs text-slate-400">{{ now()->format('M j, Y') }}</span>
-
-                {{-- Favorites button --}}
-                <button id="watchlist-toggle-btn"
-                    class="relative flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200
-                           hover:border-brand hover:text-brand text-slate-600 transition-all text-sm font-semibold bg-white">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                    </svg>
-                    <span class="hidden sm:inline">Favorites</span>
-                    <span id="watchlist-count"
-                        class="hidden absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1
-                               rounded-full bg-brand text-white text-[10px] font-black
-                               flex items-center justify-center leading-none">0</span>
-                </button>
             </div>
         </div>
     </div>
@@ -124,18 +106,15 @@
     {{-- Sidebar header --}}
     <div class="flex items-center justify-between px-5 py-4 bg-brand shrink-0">
         <div class="flex items-center gap-2.5">
-            <div class="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2"
-                     stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
-                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-                    <line x1="7" y1="7" x2="7.01" y2="7"/>
-                </svg>
+                <div class="w-8 h-8 rounded-lg overflow-hidden shrink-0">
+                    <img src="{{ asset('images/scclogo.png') }}" alt="San Carlos City Logo"
+                         class="w-full h-full object-cover"/>
+                </div>
+                <div class="leading-tight">
+                    <p class="text-white font-black text-sm">SCCPresyo</p>
+                    <p class="text-green-300 text-[10px] font-semibold tracking-wider uppercase">San Carlos City</p>
+                </div>
             </div>
-            <div class="leading-tight">
-                <p class="text-white font-black text-sm">SCCPresyo</p>
-                <p class="text-green-300 text-[10px] font-semibold tracking-wider uppercase">San Carlos City</p>
-            </div>
-        </div>
         <button id="sidebar-close-btn"
             class="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white"
             aria-label="Close menu">
@@ -405,17 +384,6 @@
                 </svg>
                 All Commodities
             </button>
-            <button id="tab-watchlist"
-                class="tab-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
-                       transition-all duration-200 border border-slate-200 text-slate-600
-                       hover:border-brand hover:text-brand bg-white">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
-                </svg>
-                My Favorites
-            </button>
-
             <div class="ml-auto flex items-center gap-2 border border-slate-200 rounded-full px-3.5 py-1.5 bg-slate-50">
                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -791,8 +759,43 @@
                             <span id="modal-chart-label" class="text-xs text-slate-400 font-normal normal-case ml-auto"></span>
                         </div>
                         <div class="bg-slate-50 rounded-xl p-4 border border-slate-200/80">
+                            {{-- Period filter pills --}}
+                            <div id="chart-period-pills" class="flex items-center gap-1.5 mb-3">
+                                <span class="text-[10px] font-semibold text-slate-400 mr-1">Period:</span>
+                                <button data-period="7"
+                                    class="chart-period-btn px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all
+                                           bg-brand border-brand text-white">
+                                    7d
+                                </button>
+                                <button data-period="14"
+                                    class="chart-period-btn px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all
+                                           border-slate-200 text-slate-500 bg-white hover:border-brand hover:text-brand">
+                                    14d
+                                </button>
+                                <button data-period="30"
+                                    class="chart-period-btn px-2.5 py-1 rounded-full text-[11px] font-bold border transition-all
+                                           border-slate-200 text-slate-500 bg-white hover:border-brand hover:text-brand">
+                                    30d
+                                </button>
+                            </div>
                             <div class="relative h-48">
                                 <canvas id="price-chart"></canvas>
+                            </div>
+                            {{-- Month timeline axis — click to highlight, multi-select --}}
+                            <div class="flex justify-between mt-2 px-0.5" id="month-axis">
+                                @php $currentMonth = now()->month; @endphp
+                                @foreach (['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] as $idx => $mon)
+                                <button
+                                    class="month-btn text-[9px] font-semibold leading-tight pb-0.5 border-b-2 transition-all duration-150
+                                           {{ $idx + 1 === $currentMonth
+                                               ? 'text-brand font-black border-brand'
+                                               : 'text-slate-300 border-transparent hover:text-slate-400' }}"
+                                    data-month="{{ $idx + 1 }}"
+                                    aria-pressed="{{ $idx + 1 === $currentMonth ? 'true' : 'false' }}"
+                                    title="{{ $mon }}">
+                                    {{ $mon }}
+                                </button>
+                                @endforeach
                             </div>
                             <div id="no-chart-data"
                                  class="hidden flex-col items-center justify-center h-48 gap-2 text-center">
@@ -1125,16 +1128,16 @@
                     </div>
                     <div class="grid grid-cols-2 gap-2 ml-9">
                         <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
-                            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">SRP</p>
-                            <p class="text-base font-black text-slate-700">${fmt(e.srp)}</p>
+                            <p class="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Suggested Retail Price (SRP)</p>
+                            <p class="text-base font-black text-slate-900">${fmt(e.srp)}</p>
                         </div>
                         <div class="rounded-xl px-3 py-2.5 border
                             ${e.status === 'above' ? 'bg-rose-50 border-rose-200'
                             : e.status === 'below' ? 'bg-emerald-50 border-emerald-200'
                             : e.status === 'equal' ? 'bg-brand/5 border-brand/20'
                             : 'bg-slate-50 border-slate-200'}">
-                            <p class="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Prevailing</p>
-                            <p class="text-base font-black ${sc.price}">${fmt(e.prevailing_price)}</p>
+                            <p class="text-[9px] font-bold uppercase tracking-widest text-slate-500 mb-1">Prevailing Price</p>
+                            <p class="text-base font-black text-slate-900">${fmt(e.prevailing_price)}</p>
                         </div>
                     </div>
                 </div>`;
@@ -1147,12 +1150,29 @@
         const canvas = document.getElementById('price-chart');
         if (!canvas) return;
 
+        // Reset period pills to 7d active
+        document.querySelectorAll('.chart-period-btn').forEach(btn => {
+            const active = btn.dataset.period === '7';
+            btn.className = btn.className.replace(/bg-brand\s*|border-brand\s*|text-white\s*|border-slate-200\s*|text-slate-500\s*|bg-white\s*/g, '').trim();
+            if (active) {
+                btn.classList.add('bg-brand', 'border-brand', 'text-white');
+            } else {
+                btn.classList.add('border-slate-200', 'text-slate-500', 'bg-white');
+            }
+        });
+
         if (!chart.data || !chart.data.length) {
             canvas.parentElement.classList.add('hidden');
+            const pills = document.getElementById('chart-period-pills');
+            if (pills) pills.classList.add('hidden');
             if (noChartData) { noChartData.classList.remove('hidden'); noChartData.classList.add('flex'); }
             if (modalChartLabel) modalChartLabel.textContent = '';
             return;
         }
+
+        // Show pills
+        const pills = document.getElementById('chart-period-pills');
+        if (pills) pills.classList.remove('hidden');
 
         canvas.parentElement.classList.remove('hidden');
         if (noChartData) { noChartData.classList.add('hidden'); noChartData.classList.remove('flex'); }
@@ -1160,62 +1180,100 @@
             ? `${chart.data.length} data point${chart.data.length !== 1 ? 's' : ''}`
             : 'Current prices by establishment';
 
-        const ctx = canvas.getContext('2d');
-        const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-        gradient.addColorStop(0, 'rgba(24,107,2,0.18)');
-        gradient.addColorStop(1, 'rgba(24,107,2,0)');
+        // Store full dataset for period slicing
+        const fullLabels = chart.labels;
+        const fullData   = chart.data;
 
-        priceChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: chart.labels,
-                datasets: [{
-                    label: 'Prevailing Price (₱)',
-                    data: chart.data,
-                    borderColor: '#186b02',
-                    borderWidth: 2.5,
-                    backgroundColor: gradient,
-                    fill: true,
-                    tension: 0.4,
-                    pointRadius: chart.data.length <= 10 ? 5 : 3,
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: '#186b02',
-                    pointBorderColor: '#ffffff',
-                    pointBorderWidth: 2,
-                }],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        backgroundColor: '#1e293b',
-                        titleColor: '#94a3b8',
-                        bodyColor: '#f1f5f9',
-                        padding: 10,
-                        cornerRadius: 8,
-                        callbacks: {
-                            label: ctx => ' ₱ ' + parseFloat(ctx.raw).toLocaleString('en-PH', { minimumFractionDigits: 2 }),
+        function buildChart(labels, data) {
+            if (priceChartInstance) { priceChartInstance.destroy(); priceChartInstance = null; }
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+            gradient.addColorStop(0, 'rgba(24,107,2,0.18)');
+            gradient.addColorStop(1, 'rgba(24,107,2,0)');
+
+            priceChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Prevailing Price (₱)',
+                        data,
+                        borderColor: '#186b02',
+                        borderWidth: 2.5,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: data.length <= 10 ? 5 : 3,
+                        pointHoverRadius: 7,
+                        pointBackgroundColor: '#186b02',
+                        pointBorderColor: '#ffffff',
+                        pointBorderWidth: 2,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: '#1e293b',
+                            titleColor: '#94a3b8',
+                            bodyColor: '#f1f5f9',
+                            padding: 10,
+                            cornerRadius: 8,
+                            callbacks: {
+                                label: ctx => ' ₱ ' + parseFloat(ctx.raw).toLocaleString('en-PH', { minimumFractionDigits: 2 }),
+                            },
+                        },
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#94a3b8', font: { size: 11 }, maxRotation: 45 },
+                            border: { display: false },
+                        },
+                        y: {
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                color: '#94a3b8', font: { size: 11 },
+                                callback: v => '₱' + parseFloat(v).toLocaleString('en-PH', { minimumFractionDigits: 2 }),
+                            },
+                            border: { display: false },
                         },
                     },
                 },
-                scales: {
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#94a3b8', font: { size: 11 }, maxRotation: 45 },
-                        border: { display: false },
-                    },
-                    y: {
-                        grid: { color: '#f1f5f9' },
-                        ticks: {
-                            color: '#94a3b8', font: { size: 11 },
-                            callback: v => '₱' + parseFloat(v).toLocaleString('en-PH', { minimumFractionDigits: 2 }),
-                        },
-                        border: { display: false },
-                    },
-                },
-            },
+            });
+        }
+
+        // Initial render with all data (up to 7 points shown as "7d" default)
+        buildChart(fullLabels.slice(-7), fullData.slice(-7));
+
+        // Period pill click handler
+        document.querySelectorAll('.chart-period-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const days = parseInt(btn.dataset.period, 10);
+
+                // Update active pill style
+                document.querySelectorAll('.chart-period-btn').forEach(b => {
+                    const isActive = b === btn;
+                    b.className = b.className.replace(/bg-brand\s*|border-brand\s*|text-white\s*|border-slate-200\s*|text-slate-500\s*|bg-white\s*/g, '').trim();
+                    if (isActive) {
+                        b.classList.add('bg-brand', 'border-brand', 'text-white');
+                    } else {
+                        b.classList.add('border-slate-200', 'text-slate-500', 'bg-white');
+                    }
+                });
+
+                // Slice data to the chosen period and redraw
+                const sliceLabels = fullLabels.slice(-days);
+                const sliceData   = fullData.slice(-days);
+                buildChart(sliceLabels, sliceData);
+
+                // Update label
+                if (modalChartLabel) {
+                    modalChartLabel.textContent = `${sliceData.length} data point${sliceData.length !== 1 ? 's' : ''}`;
+                }
+            });
         });
     }
 
@@ -1754,6 +1812,26 @@
     // (Escape is handled globally above)
 
     syncSidebarFavCount();
+
+    // ══════════════════════════════════════════════════════════════
+    // MONTH AXIS — single-select toggle with green underline
+    // ══════════════════════════════════════════════════════════════
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('.month-btn');
+        if (!btn) return;
+
+        // Clear all months first
+        document.querySelectorAll('.month-btn').forEach(b => {
+            b.setAttribute('aria-pressed', 'false');
+            b.classList.remove('text-brand', 'font-black', 'border-brand');
+            b.classList.add('text-slate-300', 'border-transparent');
+        });
+
+        // Highlight only the clicked one
+        btn.setAttribute('aria-pressed', 'true');
+        btn.classList.add('text-brand', 'font-black', 'border-brand');
+        btn.classList.remove('text-slate-300', 'border-transparent');
+    });
 
 })();
 </script>
