@@ -7,7 +7,7 @@
 
 {{-- ══ SRP TICKER ══════════════════════════════════════════════════ --}}
 @php
-    $tickerItems = $variants->getCollection()->filter(fn ($v) => $v->srp > 0)->take(18);
+    $tickerItems = $groups->getCollection()->filter(fn ($g) => $g->srp !== null && $g->srp > 0)->take(18);
 @endphp
 @if ($tickerItems->isNotEmpty())
 <div class="bg-brand border-b-2 border-brand-dark overflow-hidden ticker-wrap" aria-label="Live SRP ticker">
@@ -20,8 +20,8 @@
             <div class="ticker-track inline-flex gap-10 whitespace-nowrap">
                 @foreach (array_merge($tickerItems->all(), $tickerItems->all()) as $t)
                 <span class="shrink-0 text-xs flex items-center gap-1.5">
-                    <span class="text-white font-semibold">{{ $t->commodity->product_name }}</span>
-                    @if ($t->commodity->brand)<span class="text-green-300">({{ $t->commodity->brand->name }})</span>@endif
+                    <span class="text-white font-semibold">{{ $t->product_name }}</span>
+                    @if ($t->brand_name)<span class="text-green-300">({{ $t->brand_name }})</span>@endif
                     <span class="text-green-400">—</span>
                     <span class="text-white font-black font-mono">₱{{ number_format($t->srp, 2) }}</span>
                     <span class="text-green-400 text-[11px]">/ {{ $t->unit_of_measure }}</span>
@@ -376,8 +376,8 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                             d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                     </svg>
-                    <span class="text-xs font-bold text-slate-700">{{ number_format($variants->total()) }}</span>
-                    <span class="text-xs text-slate-400">{{ Str::plural('item', $variants->total()) }}</span>
+                    <span class="text-xs font-bold text-slate-700">{{ number_format($groups->total()) }}</span>
+                    <span class="text-xs text-slate-400">{{ Str::plural('item', $groups->total()) }}</span>
                 </div>
 
             </div>
@@ -389,7 +389,7 @@
 {{-- ══ CARDS GRID ════════════════════════════════════════════════════ --}}
 <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
-    @if ($variants->isEmpty())
+    @if ($groups->isEmpty())
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-24 text-center">
             <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-100 mb-4">
                 <svg class="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,62 +421,72 @@
             <p class="mt-1 text-sm text-slate-400">Star any commodity card to add it here.</p>
         </div>
 
-        {{-- Cards --}}
+        {{-- Cards — one card per product + size, priced across establishments --}}
         <div id="cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            @foreach ($variants as $v)
+            @foreach ($groups as $g)
                 @php
-                    $prevailing = $v->prevailing_price ? (float) $v->prevailing_price : null;
-                    $srp        = $v->srp              ? (float) $v->srp              : null;
-                    $diff       = ($prevailing !== null && $srp !== null) ? round($prevailing - $srp, 2) : null;
-                    $pct        = ($diff !== null && $srp > 0) ? round(($diff / $srp) * 100, 1) : null;
-                    $isAbove    = $diff !== null && $diff > 0;
-                    $isBelow    = $diff !== null && $diff < 0;
-                    $isEqual    = $diff !== null && $diff == 0;
-                    $estName    = $v->commodity->juridical_id
-                                    ? ($establishmentNames[$v->commodity->juridical_id] ?? null)
-                                    : null;
+                    $srp      = $g->srp;
+                    $lowest   = $g->min_price;
+                    $highest  = $g->max_price;
+                    $diff     = ($lowest !== null && $srp !== null) ? round($lowest - $srp, 2) : null;
+                    $pct      = ($diff !== null && $srp > 0) ? round(($diff / $srp) * 100, 1) : null;
+                    $isAbove  = $diff !== null && $diff > 0;
+                    $isBelow  = $diff !== null && $diff < 0;
+                    $isEqual  = $diff !== null && $diff == 0;
+                    $estCount = $g->establishment_count;
+                    $estNames = $g->establishment_names;
+                    $hasRange = $lowest !== null && $highest !== null && $highest > $lowest;
+
+                    $span    = $hasRange ? max($highest - $lowest, 0.01) : 0;
+                    $srpMark = ($hasRange && $srp !== null)
+                        ? round(min(100, max(0, (($srp - $lowest) / $span) * 100)), 1)
+                        : null;
                 @endphp
 
-                <div id="card-{{ $v->id }}"
+                <div id="card-{{ $g->variant_id }}"
                      class="price-card bg-white rounded-2xl border border-slate-200/80 shadow-sm
                             hover:shadow-lg hover:-translate-y-0.5 flex flex-col overflow-hidden
                             cursor-pointer group"
-                     data-id="{{ $v->id }}"
-                     data-name="{{ strtolower($v->commodity->product_name . ' ' . ($v->commodity->brand?->name ?? '')) }}"
-                     data-product="{{ $v->commodity->product_name }}"
-                     data-brand="{{ $v->commodity->brand?->name ?? '' }}"
-                     data-unit="{{ $v->unit_of_measure }}"
+                     data-id="{{ $g->variant_id }}"
+                     data-key="{{ $g->group_key }}"
+                     data-name="{{ strtolower($g->product_name . ' ' . ($g->brand_name ?? '')) }}"
+                     data-product="{{ $g->product_name }}"
+                     data-brand="{{ $g->brand_name ?? '' }}"
+                     data-unit="{{ $g->unit_of_measure }}"
                      data-srp="{{ $srp ?? '' }}"
-                     data-prevailing="{{ $prevailing ?? '' }}"
-                     data-category="{{ $v->commodity->category?->name ?? '' }}"
+                     data-prevailing="{{ $lowest ?? '' }}"
+                     data-prevailing-max="{{ $highest ?? '' }}"
+                     data-count="{{ $estCount }}"
+                     data-category="{{ $g->category_name ?? '' }}"
                      role="button" tabindex="0"
-                     aria-label="View price details for {{ $v->commodity->product_name }}">
+                     aria-label="View price details for {{ $g->product_name }}">
 
                     {{-- Card header --}}
                     <div class="px-5 pt-5 pb-4 flex items-start justify-between gap-3">
                         <div class="min-w-0 flex-1">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold
                                          bg-brand/10 text-brand mb-2">
-                                {{ $v->commodity->category?->name ?? 'General' }}
+                                {{ $g->category_name ?? 'General' }}
                             </span>
                             <h3 class="font-black text-slate-900 text-lg leading-snug
                                        group-hover:text-brand transition-colors">
-                                {{ $v->commodity->product_name }}
+                                {{ $g->product_name }}
                             </h3>
                             <div class="flex items-center gap-2 mt-1 flex-wrap">
-                                @if ($v->commodity->brand)
-                                    <span class="text-sm text-slate-500">{{ $v->commodity->brand->name }}</span>
+                                @if ($g->brand_name)
+                                    <span class="text-sm text-slate-500">{{ $g->brand_name }}</span>
                                     <span class="text-slate-300">·</span>
                                 @endif
                                 <span class="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">
-                                    {{ $v->unit_of_measure }}
+                                    {{ $g->unit_of_measure }}
                                 </span>
                             </div>
                         </div>
 
                         {{-- Star / watchlist button --}}
                         <button class="star-btn shrink-0 p-2 rounded-xl hover:bg-brand/10 transition-colors"
-                                data-id="{{ $v->id }}"
+                                data-key="{{ $g->group_key }}"
+                                data-id="{{ $g->variant_id }}"
                                 aria-label="Add to watchlist" title="Add to watchlist">
                             <svg class="w-5 h-5 text-slate-300 transition-colors" fill="none" stroke="currentColor"
                                  stroke-width="1.8" viewBox="0 0 24 24">
@@ -489,7 +499,7 @@
                     {{-- Price body --}}
                     <div class="px-5 pb-5 flex-1 flex flex-col gap-4">
 
-                        {{-- SRP + Prevailing price box --}}
+                        {{-- SRP + lowest prevailing price box --}}
                         <div class="bg-slate-50 rounded-xl p-4 space-y-3 border border-slate-100">
                             <div class="flex items-center justify-between">
                                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">SRP</span>
@@ -500,7 +510,7 @@
                             <div class="border-t border-slate-200"></div>
                             <div class="flex items-center justify-between gap-2">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Prevailing</span>
+                                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">Lowest</span>
                                     @if ($isAbove)
                                         <span class="inline-flex items-center gap-0.5 text-rose-700 bg-rose-50 px-2 py-0.5
                                                      rounded-md text-xs font-bold">
@@ -521,38 +531,44 @@
                                 </div>
                                 <span class="text-xl font-black font-mono
                                     {{ $isAbove ? 'text-rose-600' : ($isBelow ? 'text-emerald-700' : ($isEqual ? 'text-brand' : 'text-slate-400')) }}">
-                                    {{ $prevailing !== null ? '₱ ' . number_format($prevailing, 2) : '—' }}
+                                    {{ $lowest !== null ? '₱ ' . number_format($lowest, 2) : '—' }}
                                 </span>
+                            </div>
+                            <div class="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                                <span>{{ $estCount }} {{ Str::plural('establishment', $estCount) }}</span>
+                                @if ($hasRange)
+                                    <span class="font-mono font-semibold text-slate-500">
+                                        ₱{{ number_format($lowest, 2) }} – ₱{{ number_format($highest, 2) }}
+                                    </span>
+                                @endif
                             </div>
                         </div>
 
-                        {{-- Sparkline + diff badge --}}
+                        {{-- Observed range (lowest → highest) + diff badge --}}
                         <div class="flex items-center gap-3">
-                            <div class="flex-1 h-9 rounded-lg overflow-hidden opacity-75">
-                                @if ($isAbove)
-                                    <svg viewBox="0 0 80 32" class="w-full h-full" preserveAspectRatio="none">
-                                        <polyline points="0,28 15,24 28,26 42,20 55,15 68,11 80,7"
-                                            fill="none" stroke="#f43f5e" stroke-width="2"
-                                            stroke-linecap="round" stroke-linejoin="round"/>
-                                        <polyline points="0,28 15,24 28,26 42,20 55,15 68,11 80,7 80,32 0,32"
-                                            fill="#f43f5e" fill-opacity="0.08" stroke="none"/>
-                                    </svg>
-                                @elseif ($isBelow)
-                                    <svg viewBox="0 0 80 32" class="w-full h-full" preserveAspectRatio="none">
-                                        <polyline points="0,7 15,11 28,9 42,15 55,18 68,22 80,26"
-                                            fill="none" stroke="#186b02" stroke-width="2"
-                                            stroke-linecap="round" stroke-linejoin="round"/>
-                                        <polyline points="0,7 15,11 28,9 42,15 55,18 68,22 80,26 80,32 0,32"
-                                            fill="#186b02" fill-opacity="0.08" stroke="none"/>
-                                    </svg>
+                            <div class="flex-1 min-w-0">
+                                @if ($hasRange)
+                                    <div class="relative h-1.5 rounded-full bg-gradient-to-r from-emerald-300 via-amber-200 to-rose-300">
+                                        @if ($srpMark !== null)
+                                            <span class="absolute -top-[3px] w-3 h-3 rounded-full bg-white ring-2 ring-slate-400"
+                                                  style="left: {{ $srpMark }}%; transform: translateX(-50%)"
+                                                  title="SRP ₱{{ number_format($srp, 2) }}"></span>
+                                        @endif
+                                    </div>
+                                    <div class="flex items-center justify-between mt-1.5 text-[10px] font-semibold">
+                                        <span class="text-emerald-700 font-mono">₱{{ number_format($lowest, 2) }}</span>
+                                        <span class="text-slate-400">SRP</span>
+                                        <span class="text-rose-600 font-mono">₱{{ number_format($highest, 2) }}</span>
+                                    </div>
+                                @elseif ($lowest !== null)
+                                    <div class="h-1.5 rounded-full bg-slate-200"></div>
+                                    <div class="flex items-center justify-between mt-1.5 text-[10px] font-semibold">
+                                        <span class="text-slate-400">Observed price</span>
+                                        <span class="font-mono text-slate-600">₱{{ number_format($lowest, 2) }}</span>
+                                    </div>
                                 @else
-                                    <svg viewBox="0 0 80 32" class="w-full h-full" preserveAspectRatio="none">
-                                        <polyline points="0,16 15,15 28,17 42,16 55,15 68,16 80,16"
-                                            fill="none" stroke="#94a3b8" stroke-width="2"
-                                            stroke-linecap="round" stroke-linejoin="round"/>
-                                        <polyline points="0,16 15,15 28,17 42,16 55,15 68,16 80,16 80,32 0,32"
-                                            fill="#94a3b8" fill-opacity="0.06" stroke="none"/>
-                                    </svg>
+                                    <div class="h-1.5 rounded-full bg-slate-100"></div>
+                                    <p class="mt-1.5 text-[10px] font-semibold text-slate-400">No prevailing price yet</p>
                                 @endif
                             </div>
                             @if ($diff === null)
@@ -570,10 +586,10 @@
                             @endif
                         </div>
 
-                        {{-- Establishment & agency --}}
-                        @if ($estName || $v->commodity->category?->agency)
+                        {{-- Establishments & monitoring agency --}}
+                        @if ($estCount > 0 || $g->agency_name)
                         <div class="pt-3 border-t border-slate-100 space-y-1.5">
-                            @if ($estName)
+                            @foreach (array_slice($estNames, 0, 2) as $estName)
                             <div class="flex items-center gap-2 text-sm text-slate-500">
                                 <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -583,14 +599,19 @@
                                 </svg>
                                 <span class="truncate text-xs font-medium">{{ $estName }}</span>
                             </div>
+                            @endforeach
+                            @if (count($estNames) > 2)
+                            <p class="pl-6 text-[11px] font-medium text-slate-400">
+                                +{{ count($estNames) - 2 }} more {{ Str::plural('establishment', count($estNames) - 2) }}
+                            </p>
                             @endif
-                            @if ($v->commodity->category?->agency)
+                            @if ($g->agency_name)
                             <div class="flex items-center gap-2 text-xs text-slate-400">
                                 <svg class="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                         d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
                                 </svg>
-                                Monitored by {{ $v->commodity->category->agency->name }}
+                                Monitored by {{ $g->agency_name }}
                             </div>
                             @endif
                         </div>
@@ -605,7 +626,11 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                             </svg>
-                            Click to compare establishments
+                            @if ($estCount > 1)
+                                Compare {{ $estCount }} establishments
+                            @else
+                                View price details
+                            @endif
                         </div>
                     </div>
                 </div>
@@ -613,29 +638,29 @@
         </div>
 
         {{-- Pagination --}}
-        @if ($variants->hasPages())
+        @if ($groups->hasPages())
         <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
             <span class="text-xs text-slate-500">
-                Showing <strong>{{ $variants->firstItem() }}–{{ $variants->lastItem() }}</strong>
-                of <strong>{{ $variants->total() }}</strong> items
+                Showing <strong>{{ $groups->firstItem() }}–{{ $groups->lastItem() }}</strong>
+                of <strong>{{ $groups->total() }}</strong> items
             </span>
             <div class="flex items-center gap-1.5 flex-wrap">
-                @if (!$variants->onFirstPage())
-                    <a href="{{ $variants->previousPageUrl() }}"
+                @if (!$groups->onFirstPage())
+                    <a href="{{ $groups->previousPageUrl() }}"
                        class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold
                               text-slate-600 hover:border-brand hover:text-brand transition-all">← Prev</a>
                 @endif
-                @foreach ($variants->getUrlRange(max(1, $variants->currentPage() - 2), min($variants->lastPage(), $variants->currentPage() + 2)) as $page => $url)
+                @foreach ($groups->getUrlRange(max(1, $groups->currentPage() - 2), min($groups->lastPage(), $groups->currentPage() + 2)) as $page => $url)
                     <a href="{{ $url }}"
                        class="px-3.5 py-2 rounded-xl border text-sm font-semibold transition-all
-                              {{ $page == $variants->currentPage()
+                              {{ $page == $groups->currentPage()
                                   ? 'bg-brand border-brand text-white shadow-sm'
                                   : 'border-slate-200 bg-white text-slate-600 hover:border-brand hover:text-brand' }}">
                         {{ $page }}
                     </a>
                 @endforeach
-                @if ($variants->hasMorePages())
-                    <a href="{{ $variants->nextPageUrl() }}"
+                @if ($groups->hasMorePages())
+                    <a href="{{ $groups->nextPageUrl() }}"
                        class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold
                               text-slate-600 hover:border-brand hover:text-brand transition-all">Next →</a>
                 @endif
@@ -1017,7 +1042,7 @@
     'use strict';
 
     const DETAIL_BASE = '{{ url("/sccpresyo/detail") }}';
-    const STORAGE_KEY = 'scc_watchlist_v2';
+    const STORAGE_KEY = 'scc_watchlist_v3';
 
     // ── State ──────────────────────────────────────────────────────
     let watchlist = new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
@@ -1355,17 +1380,23 @@
         }
 
         allCards.forEach(card => {
-            const id = card.dataset.id;
-            if (!watchlist.has(id)) return;
+            const key = card.dataset.key;
+            if (!watchlist.has(key)) return;
 
+            const id         = card.dataset.id;
             const product    = card.dataset.product || '—';
             const brand      = card.dataset.brand   || '';
             const unit       = card.dataset.unit    || '';
             const srpVal     = card.dataset.srp     ? parseFloat(card.dataset.srp)        : null;
             const prevVal    = card.dataset.prevailing ? parseFloat(card.dataset.prevailing) : null;
+            const maxVal     = card.dataset.prevailingMax ? parseFloat(card.dataset.prevailingMax) : null;
+            const estCount   = parseInt(card.dataset.count || '0', 10);
             const category   = card.dataset.category || '';
             const srpDisplay = srpVal  != null ? '₱ ' + srpVal.toFixed(2) : '—';
             const prvDisplay = prevVal != null ? '₱ ' + prevVal.toFixed(2) : '—';
+            const rangeText  = (prevVal != null && maxVal != null && maxVal > prevVal)
+                ? `₱${prevVal.toFixed(2)} – ₱${maxVal.toFixed(2)}`
+                : null;
 
             let priceBadge = '';
             if (prevVal !== null && srpVal !== null) {
@@ -1387,7 +1418,7 @@
                         <p class="text-xs text-slate-400">${[brand, unit].filter(Boolean).join(' · ')}</p>
                     </div>
                     <button class="drawer-unstar shrink-0 p-1.5 rounded-lg hover:bg-rose-50 transition-colors"
-                            data-id="${id}" title="Remove from watchlist">
+                            data-key="${key}" title="Remove from watchlist">
                         <svg class="w-4 h-4" fill="#186b02" stroke="#186b02" stroke-width="1.5" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
@@ -1397,10 +1428,11 @@
                 <div class="flex items-center justify-between flex-wrap gap-1">
                     <p class="text-xs text-slate-500">
                         SRP <span class="font-semibold text-slate-700">${srpDisplay}</span>
-                        · Now <span class="font-bold text-slate-900">${prvDisplay}</span>
+                        · Lowest <span class="font-bold text-slate-900">${prvDisplay}</span>
                     </p>
                     ${priceBadge}
-                </div>`;
+                </div>
+                ${estCount > 0 ? `<p class="text-[10px] text-slate-400 mt-1">${estCount} ${estCount === 1 ? 'store' : 'stores'}${rangeText ? ' · ' + rangeText : ''}</p>` : ''}`;
 
             item.addEventListener('click', e => {
                 if (e.target.closest('.drawer-unstar')) return;
@@ -1409,7 +1441,7 @@
 
             item.querySelector('.drawer-unstar').addEventListener('click', function (e) {
                 e.stopPropagation();
-                watchlist.delete(this.dataset.id);
+                watchlist.delete(this.dataset.key);
                 saveWatchlist(); syncStarButtons(); updateCountBadge();
                 item.remove();
                 if (watchlist.size === 0) renderDrawer();
@@ -1425,8 +1457,7 @@
     drawerOverlay?.addEventListener('click', e => { if (e.target === drawerOverlay) closeDrawer(); });
     viewAllBtn?.addEventListener('click', () => {
         closeDrawer();
-        setActiveTab('watchlist');
-        window.scrollTo({ top: (cardsGrid?.offsetTop ?? 0) - 140, behavior: 'smooth' });
+        openFavoritesModal();
     });
 
     // ══════════════════════════════════════════════════════════════
@@ -1447,7 +1478,7 @@
 
     function syncStarButtons() {
         document.querySelectorAll('.star-btn').forEach(btn => {
-            const starred = watchlist.has(btn.dataset.id);
+            const starred = watchlist.has(btn.dataset.key);
             btn.classList.toggle('starred', starred);
             btn.setAttribute('aria-label', starred ? 'Remove from watchlist' : 'Add to watchlist');
             btn.title = starred ? 'Remove from watchlist' : 'Add to watchlist';
@@ -1457,11 +1488,11 @@
     document.querySelectorAll('.star-btn').forEach(btn => {
         btn.addEventListener('click', e => {
             e.stopPropagation();
-            const id = btn.dataset.id;
-            if (watchlist.has(id)) {
-                watchlist.delete(id);
+            const key = btn.dataset.key;
+            if (watchlist.has(key)) {
+                watchlist.delete(key);
             } else {
-                watchlist.add(id);
+                watchlist.add(key);
                 btn.querySelector('svg').animate(
                     [{ transform: 'scale(1)' }, { transform: 'scale(1.5)' }, { transform: 'scale(1)' }],
                     { duration: 280, easing: 'ease-out' }
@@ -1480,7 +1511,7 @@
         const query = (document.getElementById('main-search')?.value || '').toLowerCase().trim();
         let visible = 0;
         allCards.forEach(card => {
-            const show = (activeTab === 'all' || watchlist.has(card.dataset.id))
+            const show = (activeTab === 'all' || watchlist.has(card.dataset.key))
                       && (!query || (card.dataset.name || '').includes(query));
             card.style.display = show ? '' : 'none';
             if (show) visible++;
@@ -1605,17 +1636,23 @@
         }
 
         allCards.forEach(card => {
-            const id = card.dataset.id;
-            if (!watchlist.has(id)) return;
+            const key = card.dataset.key;
+            if (!watchlist.has(key)) return;
 
+            const id         = card.dataset.id;
             const product    = card.dataset.product    || '—';
             const brand      = card.dataset.brand      || '';
             const unit       = card.dataset.unit       || '';
             const category   = card.dataset.category   || '';
             const srpVal     = card.dataset.srp        ? parseFloat(card.dataset.srp)         : null;
             const prevVal    = card.dataset.prevailing ? parseFloat(card.dataset.prevailing)  : null;
+            const maxVal     = card.dataset.prevailingMax ? parseFloat(card.dataset.prevailingMax) : null;
+            const estCount   = parseInt(card.dataset.count || '0', 10);
             const srpDisplay = srpVal  != null ? '₱ ' + srpVal.toFixed(2)  : '—';
             const prvDisplay = prevVal != null ? '₱ ' + prevVal.toFixed(2) : '—';
+            const rangeText  = (prevVal != null && maxVal != null && maxVal > prevVal)
+                ? `₱${prevVal.toFixed(2)} – ₱${maxVal.toFixed(2)}`
+                : null;
 
             let statusBadge = '<span class="text-xs text-slate-400">No price data</span>';
             if (prevVal !== null && srpVal !== null) {
@@ -1639,11 +1676,12 @@
                         </div>
                         <div class="w-px h-6 bg-slate-200"></div>
                         <div class="text-center">
-                            <p class="text-[9px] font-bold uppercase tracking-widest text-slate-400">Prevailing</p>
+                            <p class="text-[9px] font-bold uppercase tracking-widest text-slate-400">Lowest</p>
                             <p class="text-sm font-black ${prevVal !== null && srpVal !== null ? (prevVal > srpVal ? 'text-rose-600' : (prevVal < srpVal ? 'text-emerald-700' : 'text-brand')) : 'text-slate-400'}">${prvDisplay}</p>
                         </div>
                         <div class="ml-1">${statusBadge}</div>
                     </div>
+                    ${estCount > 0 ? `<p class="text-[10px] text-slate-400 mt-2">${estCount} ${estCount === 1 ? 'establishment' : 'establishments'}${rangeText ? ' · ' + rangeText : ''}</p>` : ''}
                 </div>
                 <div class="flex flex-col items-center gap-2 shrink-0">
                     <button class="fav-view-btn p-2 rounded-xl bg-white border border-slate-200 hover:border-brand hover:text-brand text-slate-400 transition-all" data-id="${id}" title="View details">
@@ -1668,7 +1706,7 @@
             // Remove from favorites
             row.querySelector('.fav-remove-btn').addEventListener('click', e => {
                 e.stopPropagation();
-                watchlist.delete(id);
+                watchlist.delete(key);
                 saveWatchlist(); syncStarButtons(); updateCountBadge(); syncSidebarFavCount();
                 row.remove();
                 // re-render count
