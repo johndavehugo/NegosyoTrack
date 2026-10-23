@@ -63,7 +63,7 @@
 
             <div class="w-px h-6 bg-slate-200 shrink-0 hidden sm:block"></div>
 
-            {{-- Desktop search --}}
+            {{-- Desktop search — submits the filter form --}}
             <div class="hidden sm:flex flex-1 max-w-md relative">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -71,19 +71,13 @@
                 </svg>
                 <input id="header-search" type="search"
                        value="{{ $search }}"
-                       placeholder="Search commodity or brand…"
+                       placeholder="Search commodity…"
                        class="w-full pl-9 pr-4 py-2 text-sm rounded-xl border border-slate-200 bg-slate-50
                               focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
                               placeholder-slate-400 transition-all"/>
             </div>
 
             <div class="ml-auto flex items-center gap-2">
-                {{-- Live badge --}}
-                <div class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20">
-                    <span class="live-dot w-1.5 h-1.5 rounded-full bg-brand inline-block"></span>
-                    <span class="text-[10px] font-black tracking-widest text-brand uppercase">Live</span>
-                </div>
-
                 {{-- Date --}}
                 <span class="hidden md:block text-xs text-slate-400">{{ now()->format('M j, Y') }}</span>
             </div>
@@ -284,10 +278,6 @@
         {{-- Title row --}}
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-6">
             <div>
-                <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-brand/10 text-brand text-xs font-bold mb-2">
-                    <span class="live-dot w-1.5 h-1.5 rounded-full bg-brand inline-block"></span>
-                    Live Monitoring
-                </div>
                 <h1 class="text-2xl sm:text-3xl font-black text-slate-900 leading-tight tracking-tight">
                     San Carlos City <span class="text-brand">e-Presyo</span>
                 </h1>
@@ -314,24 +304,25 @@
             </div>
         </div>
 
-        {{-- Mobile search --}}
-        <div class="sm:hidden mb-4 relative">
-            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
-                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <input id="mobile-search" type="search"
-                   value="{{ $search }}"
-                   placeholder="Search commodity or brand…"
-                   class="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-slate-50
-                          focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
-                          placeholder-slate-400"/>
-        </div>
-
         {{-- Filter form --}}
         <form method="GET" action="{{ route('sccpresyo.index') }}" id="filter-form">
-            @if ($search)<input type="hidden" name="search" value="{{ $search }}">@endif
-            <div class="flex flex-wrap items-end gap-3">
+            {{-- Search is part of the form so it submits properly --}}
+            <div class="flex flex-wrap items-end gap-3 mb-3">
+                <div class="flex-1 min-w-[220px]">
+                    <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Search</label>
+                    <div class="relative">
+                        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
+                             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                        </svg>
+                        <input id="main-search" type="search" name="search"
+                               value="{{ $search }}"
+                               placeholder="Search commodity…"
+                               class="w-full pl-9 pr-4 py-2.5 text-sm rounded-xl border border-slate-200 bg-white
+                                      focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+                                      placeholder-slate-400 shadow-sm"/>
+                    </div>
+                </div>
                 <div class="min-w-[170px]">
                     <label class="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wider">Category</label>
                     <select name="category" onchange="this.form.submit()"
@@ -1490,7 +1481,7 @@
     // ══════════════════════════════════════════════════════════════
 
     function applyTabAndSearch() {
-        const query = ((headerSearch?.value || '') + (mobileSearch?.value || '')).toLowerCase().trim();
+        const query = ((headerSearch?.value || '') || (document.getElementById('main-search')?.value || '')).toLowerCase().trim();
         let visible = 0;
         allCards.forEach(card => {
             const show = (activeTab === 'all' || watchlist.has(card.dataset.id))
@@ -1533,12 +1524,35 @@
     let searchTimer;
     function onSearch(e) {
         clearTimeout(searchTimer);
-        if (headerSearch) headerSearch.value = e.target.value;
-        if (mobileSearch) mobileSearch.value = e.target.value;
+        // Keep header search and main form search in sync
+        const val = e.target.value;
+        if (headerSearch) headerSearch.value = val;
+        const mainSearch = document.getElementById('main-search');
+        if (mainSearch) mainSearch.value = val;
         searchTimer = setTimeout(applyTabAndSearch, 160);
     }
     headerSearch?.addEventListener('input', onSearch);
-    mobileSearch?.addEventListener('input', onSearch);
+
+    // Submit the filter form when user presses Enter in the header search
+    headerSearch?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const mainSearch = document.getElementById('main-search');
+            if (mainSearch) mainSearch.value = headerSearch.value;
+            document.getElementById('filter-form')?.submit();
+        }
+    });
+
+    // main-search inside the form — debounced auto-submit + sync header search
+    const mainSearchEl = document.getElementById('main-search');
+    let mainSearchTimer;
+    mainSearchEl?.addEventListener('input', e => {
+        if (headerSearch) headerSearch.value = e.target.value;
+        clearTimeout(mainSearchTimer);
+        mainSearchTimer = setTimeout(() => {
+            document.getElementById('filter-form')?.submit();
+        }, 500);
+    });
 
     // Keyboard: Escape closes modals
     document.addEventListener('keydown', e => {
