@@ -487,7 +487,7 @@
                             @foreach ($photos as $photo)
                                 <figure class="photo-item">
                                     <img
-                                        src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($photo) }}"
+                                        src="{{ '/storage/'.ltrim($photo, '/') }}"
                                         alt="Photo evidence for {{ $incident->juridical_name ?? $incident->juridical_id }}"
                                     >
                                 </figure>

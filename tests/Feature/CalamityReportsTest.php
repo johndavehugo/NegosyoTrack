@@ -139,6 +139,41 @@ it('loads the calamity chart widgets', function () {
     }
 });
 
+it('shows view and add photo buttons in the photo evidence column', function () {
+    [$calamity] = calamityReportFixture();
+
+    Incident::query()
+        ->where('calamity_id', $calamity->id)
+        ->first()
+        ->update(['photos' => ['calamity-incidents/photos/sample.jpg']]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(ManageIncidents::getUrl(['record' => $calamity]))
+        ->assertOk()
+        ->assertSee('Add photo')
+        ->assertSee('View photo evidence');
+});
+
+it('deletes a single photo from an incident', function () {
+    [$calamity] = calamityReportFixture();
+
+    $incident = Incident::query()->where('calamity_id', $calamity->id)->first();
+    $incident->update([
+        'photos' => [
+            'calamity-incidents/photos/one.jpg',
+            'calamity-incidents/photos/two.jpg',
+        ],
+    ]);
+
+    Livewire::test(ManageIncidents::class, ['record' => $calamity->id])
+        ->call('deleteIncidentPhoto', $incident->id, 'calamity-incidents/photos/one.jpg')
+        ->assertHasNoErrors();
+
+    expect($incident->fresh()->photos)->toBe([
+        'calamity-incidents/photos/two.jpg',
+    ]);
+});
+
 it('renders the calamity reports sidebar page', function () {
     [$calamity] = calamityReportFixture();
 

@@ -22,6 +22,8 @@ class CalamityMonitoringService
 
     protected const CACHE_TTL_SECONDS = 21600;
 
+    public function __construct(protected ScimsJuridicalApiService $scims) {}
+
     /**
      * Live-search establishments from SCIMS.
      *
@@ -67,10 +69,24 @@ class CalamityMonitoringService
         int $recordsPerPage,
         ?string $sortColumn = null,
         ?string $sortDirection = null,
+        ?string $barangay = null,
     ): LengthAwarePaginator {
+        if (filled($barangay)) {
+            return $this->paginateEstablishmentsByBarangay(
+                barangay: $barangay,
+                search: $search,
+                page: $page,
+                recordsPerPage: $recordsPerPage,
+                sortColumn: $sortColumn,
+                sortDirection: $sortDirection,
+            );
+        }
+
         $parameters = [
             'per_page' => $recordsPerPage,
             'page' => $page,
+            'include' => 'address',
+            'expand' => 'details',
         ];
 
         if (filled($search)) {
@@ -97,6 +113,53 @@ class CalamityMonitoringService
         return new LengthAwarePaginator(
             items: collect($response->json('data', []))->keyBy('entity_no'),
             total: (int) $response->json('meta.total', 0),
+            perPage: $recordsPerPage,
+            currentPage: $page,
+        );
+    }
+
+    /**
+     * Filter the cached SCIMS registry locally because the API has no
+     * barangay filter.
+     */
+    protected function paginateEstablishmentsByBarangay(
+        string $barangay,
+        ?string $search,
+        int $page,
+        int $recordsPerPage,
+        ?string $sortColumn,
+        ?string $sortDirection,
+    ): LengthAwarePaginator {
+        $establishments = $this->scims->getAllBusinesses()
+            ->filter(fn (array $item): bool => ($item['barangay'] ?? null) === $barangay);
+
+        if (filled($search)) {
+            $term = mb_strtolower(trim($search));
+
+            $establishments = $establishments->filter(function (array $item) use ($term): bool {
+                foreach (['juri_name', 'barangay', 'street', 'line_of_industry'] as $field) {
+                    if (str_contains(mb_strtolower((string) ($item[$field] ?? '')), $term)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            });
+        }
+
+        if (filled($sortColumn)) {
+            $establishments = $establishments->sortBy(
+                $sortColumn,
+                SORT_NATURAL | SORT_FLAG_CASE,
+                $sortDirection === 'desc',
+            );
+        }
+
+        $establishments = $establishments->values();
+
+        return new LengthAwarePaginator(
+            items: $establishments->forPage($page, $recordsPerPage)->keyBy('entity_no'),
+            total: $establishments->count(),
             perPage: $recordsPerPage,
             currentPage: $page,
         );

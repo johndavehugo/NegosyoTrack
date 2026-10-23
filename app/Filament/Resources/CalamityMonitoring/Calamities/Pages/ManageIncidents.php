@@ -9,6 +9,7 @@ use App\Filament\Widgets\IncidentStatsWidget;
 use App\Models\CalamityMonitoring\Incident;
 use App\Services\CalamityMonitoring\ReportExporter;
 use App\Services\CalamityMonitoringService;
+use App\Support\Barangays;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
@@ -18,14 +19,15 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ManageRelatedRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -63,6 +65,32 @@ class ManageIncidents extends ManageRelatedRecords
             $this->getTableQueryForExport(),
             $format,
         );
+    }
+
+    public function deleteIncidentPhoto(int $record, string $photo): void
+    {
+        $incident = $this->getOwnerRecord()
+            ->incident()
+            ->whereKey($record)
+            ->firstOrFail();
+
+        $photos = collect($incident->photos ?? [])
+            ->reject(fn (string $path): bool => $path === $photo)
+            ->values()
+            ->all();
+
+        $incident->update(['photos' => $photos]);
+
+        if ($photos === []) {
+            $this->unmountAction();
+        } else {
+            $this->getMountedAction()?->record($incident->fresh());
+        }
+
+        Notification::make()
+            ->title('Photo deleted')
+            ->success()
+            ->send();
     }
 
     /**
@@ -147,14 +175,10 @@ class ManageIncidents extends ManageRelatedRecords
                     })
                     ->tooltip(fn (Incident $record): ?string => $record->juridical_id),
 
-                ImageColumn::make('photos')
+                ViewColumn::make('photos')
                     ->label('Photo Evidence')
-                    ->disk('public')
-                    ->stacked()
-                    ->limit(3)
-                    ->limitedRemainingText()
-                    ->imageHeight(40)
-                    ->placeholder('None')
+                    ->view('filament.calamity-monitoring.photos-column')
+                    ->alignCenter()
                     ->toggleable(),
 
                 TextColumn::make('date_occurred')
@@ -208,7 +232,7 @@ class ManageIncidents extends ManageRelatedRecords
                 SelectFilter::make('barangay')
                     ->label('Barangay')
                     ->searchable()
-                    ->options(fn (): array => $this->getOwnerRecord()
+                    ->options(fn (): array => Barangays::options() + $this->getOwnerRecord()
                         ->incident()
                         ->whereNotNull('barangay')
                         ->where('barangay', '!=', '')
@@ -294,7 +318,10 @@ class ManageIncidents extends ManageRelatedRecords
                     ->modalContent(function (Incident $record): View {
                         $photos = collect($record->photos ?? [])
                             ->filter(fn (string $photo): bool => Storage::disk('public')->exists($photo))
-                            ->map(fn (string $photo): string => Storage::disk('public')->url($photo))
+                            ->map(fn (string $photo): array => [
+                                'path' => $photo,
+                                'url' => '/storage/'.ltrim($photo, '/'),
+                            ])
                             ->values()
                             ->all();
 
@@ -303,6 +330,21 @@ class ManageIncidents extends ManageRelatedRecords
                             'incident' => $record,
                         ]);
                     }),
+
+                Action::make('addPhotos')
+                    ->label('Add photo')
+                    ->icon(Heroicon::Photo)
+                    ->color('primary')
+                    ->visible(fn (Incident $record): bool => blank($record->photos))
+                    ->schema([
+                        IncidentForm::photoEvidenceField(),
+                    ])
+                    ->action(function (Incident $record, array $data): void {
+                        $record->update([
+                            'photos' => array_values($data['photos'] ?? []),
+                        ]);
+                    })
+                    ->successNotificationTitle('Photo evidence added.'),
 
                 EditAction::make(),
             ]);
