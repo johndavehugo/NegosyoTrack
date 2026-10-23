@@ -103,11 +103,31 @@ class CommoditiesResource extends Resource
                     ->label('Category'),
                 TextColumn::make('juridical_id')
                     ->label('Establishment')
-                    ->formatStateUsing(function (?string $state): string {
+                    ->state(function (Commodity $record): ?string {
+                        return $record->juridical_id;
+                    })
+                    ->formatStateUsing(function (?string $state, Commodity $record) {
                         if (blank($state)) {
                             return '—';
                         }
-                        return app(PriceMonitoringService::class)->resolveEstablishmentName($state) ?? $state;
+
+                        // Batch-resolve all visible juridical_ids once per table render
+                        // by leveraging a shared static cache for the current request.
+                        static $resolved = null;
+
+                        if ($resolved === null) {
+                            $allIds = Commodity::whereNotNull('juridical_id')
+                                ->pluck('juridical_id')
+                                ->unique()
+                                ->values()
+                                ->all();
+
+                            $resolved = $allIds
+                                ? app(PriceMonitoringService::class)->resolveEstablishmentNames($allIds)
+                                : [];
+                        }
+
+                        return $resolved[$state] ?? $state;
                     })
                     ->placeholder('—')
                     ->toggleable(),
