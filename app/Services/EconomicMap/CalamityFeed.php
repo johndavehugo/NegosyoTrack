@@ -31,61 +31,39 @@ class CalamityFeed
     /**
      * Damage + affected counts keyed by raw barangay name.
      *
-     * Incident-level damage is attributed once to the main business's
-     * barangay; per-business damage is attributed per affected business.
-     * Sourced solely from `calamity_incidents` — the legacy
-     * `calamity_incident_businesses` link table is retired and unread.
+     * Barangay is snapshotted onto each incident from SCIMS when it is
+     * created, so this reads `calamity_incidents` only — no joins to the
+     * retired local MSME tables.
      *
      * @return array{by_barangay: array<string, array{damage: float, affected: int, incidents: int}>, total_damage: float, total_affected: int}
      */
     public function damageByBarangay(?int $calamityId = null): array
     {
-        $label = "COALESCE(NULLIF(TRIM(a.barangay), ''), 'Unspecified')";
+        $label = "COALESCE(NULLIF(TRIM(barangay), ''), 'Unspecified')";
 
-        $incidents = DB::table('calamity_incidents as ci')
-            ->leftJoin('juridicals as j', 'j.id', '=', 'ci.juridical_id')
-            ->leftJoin('addresses as a', 'j.address_id', '=', 'a.id')
-            ->where('ci.estimated_cost_of_damages', '>', 0)
-            ->when($calamityId > 0, fn ($query) => $query->where('ci.calamity_id', $calamityId))
+        $rows = DB::table('calamity_incidents')
+            ->where('estimated_cost_of_damages', '>', 0)
+            ->when($calamityId > 0, fn ($query) => $query->where('calamity_id', $calamityId))
             ->selectRaw("{$label} as barangay")
-            ->selectRaw('SUM(ci.estimated_cost_of_damages) as damage')
-            ->selectRaw('COUNT(DISTINCT ci.id) as incidents')
-            ->groupBy('barangay')
-            ->get();
-
-        $businesses = DB::table('calamity_incidents as ci')
-            ->leftJoin('juridicals as j', 'j.id', '=', 'ci.juridical_id')
-            ->leftJoin('addresses as a', 'j.address_id', '=', 'a.id')
-            ->where('ci.estimated_cost_of_damages', '>', 0)
-            ->when($calamityId > 0, fn ($query) => $query->where('ci.calamity_id', $calamityId))
-            ->selectRaw("{$label} as barangay")
-            ->selectRaw('SUM(ci.estimated_cost_of_damages) as damage')
-            ->selectRaw('COUNT(DISTINCT ci.juridical_id) as affected')
+            ->selectRaw('SUM(estimated_cost_of_damages) as damage')
+            ->selectRaw('COUNT(DISTINCT juridical_id) as affected')
+            ->selectRaw('COUNT(*) as incidents')
             ->groupBy('barangay')
             ->get();
 
         $damage = [];
-
-        foreach ($incidents as $row) {
-            $damage[$row->barangay] = [
-                'damage' => (float) $row->damage,
-                'affected' => 0,
-                'incidents' => (int) $row->incidents,
-            ];
-        }
-
-        foreach ($businesses as $row) {
-            $damage[$row->barangay] ??= ['damage' => 0.0, 'affected' => 0, 'incidents' => 0];
-            $damage[$row->barangay]['damage'] += (float) $row->damage;
-            $damage[$row->barangay]['affected'] += (int) $row->affected;
-        }
-
         $totalDamage = 0.0;
         $totalAffected = 0;
 
-        foreach ($damage as $entry) {
-            $totalDamage += $entry['damage'];
-            $totalAffected += $entry['affected'];
+        foreach ($rows as $row) {
+            $damage[$row->barangay] = [
+                'damage' => (float) $row->damage,
+                'affected' => (int) $row->affected,
+                'incidents' => (int) $row->incidents,
+            ];
+
+            $totalDamage += (float) $row->damage;
+            $totalAffected += (int) $row->affected;
         }
 
         return [

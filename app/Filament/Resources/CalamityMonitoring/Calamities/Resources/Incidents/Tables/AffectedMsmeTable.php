@@ -2,32 +2,44 @@
 
 namespace App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Tables;
 
-use App\Models\MsmeManagement\Address;
-use App\Models\MsmeManagement\Juridical;
+use App\Services\CalamityMonitoringService;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class AffectedMsmeTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-            ->query(Juridical::query())
-            ->defaultSort('name')
+            ->records(function (
+                CalamityMonitoringService $service,
+                int $page,
+                int $recordsPerPage,
+                ?string $search,
+                ?string $sortColumn,
+                ?string $sortDirection,
+            ): LengthAwarePaginator {
+                return $service->paginateEstablishments(
+                    search: $search,
+                    page: $page,
+                    recordsPerPage: $recordsPerPage,
+                    sortColumn: $sortColumn,
+                    sortDirection: $sortDirection,
+                );
+            })
+            ->defaultSort('juri_name')
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('juri_name')
                     ->label('MSME')
                     ->searchable()
                     ->sortable(),
 
-                TextColumn::make('address.barangay')
+                TextColumn::make('barangay')
                     ->label('Barangay')
-                    ->searchable()
-                    ->sortable(),
+                    ->searchable(),
 
-                TextColumn::make('address.street')
+                TextColumn::make('street')
                     ->label('Street')
                     ->searchable(),
 
@@ -36,44 +48,6 @@ class AffectedMsmeTable
                     ->toggleable()
                     ->searchable(),
             ])
-            ->filters([
-                SelectFilter::make('barangay')
-                    ->label('Barangay')
-                    ->searchable()
-                    ->options(fn (): array => Address::query()
-                        ->whereHas('juridical')
-                        ->whereNotNull('barangay')
-                        ->where('barangay', '!=', '')
-                        ->orderBy('barangay')
-                        ->distinct()
-                        ->pluck('barangay', 'barangay')
-                        ->all())
-                    ->query(fn (Builder $query, array $data): Builder => $query->when(
-                        filled($data['value'] ?? null),
-                        fn (Builder $query): Builder => $query->whereHas(
-                            'address',
-                            fn (Builder $query): Builder => $query->where('barangay', $data['value']),
-                        ),
-                    )),
-
-                SelectFilter::make('street')
-                    ->label('Street')
-                    ->searchable()
-                    ->options(fn (): array => Address::query()
-                        ->whereHas('juridical')
-                        ->whereNotNull('street')
-                        ->where('street', '!=', '')
-                        ->orderBy('street')
-                        ->distinct()
-                        ->pluck('street', 'street')
-                        ->all())
-                    ->query(fn (Builder $query, array $data): Builder => $query->when(
-                        filled($data['value'] ?? null),
-                        fn (Builder $query): Builder => $query->whereHas(
-                            'address',
-                            fn (Builder $query): Builder => $query->where('street', $data['value']),
-                        ),
-                    )),
-            ]);
+            ->searchable();
     }
 }

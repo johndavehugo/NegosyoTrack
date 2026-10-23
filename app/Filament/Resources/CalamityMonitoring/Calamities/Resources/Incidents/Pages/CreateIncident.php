@@ -4,8 +4,10 @@ namespace App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Inciden
 
 use App\Filament\Resources\CalamityMonitoring\Calamities\CalamityResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\IncidentResource;
+use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Schemas\IncidentForm;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Tables\AffectedMsmeTable;
-use App\Models\MsmeManagement\Juridical;
+use App\Models\CalamityMonitoring\Incident;
+use App\Services\CalamityMonitoringService;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
@@ -31,7 +33,7 @@ class CreateIncident extends CreateRecord
         return $schema
             ->components([
                 Section::make('Affected MSMEs')
-                    ->description('Filter by barangay or street to narrow the list, select every affected MSME, then enter the estimated cost of damage for each.')
+                    ->description('Search the SCIMS registry to narrow the list, select every affected MSME, then enter the estimated cost of damage and attach photo evidence for each.')
                     ->columns(2)
                     ->schema([
                         TableSelect::make('juridical_ids')
@@ -42,16 +44,30 @@ class CreateIncident extends CreateRecord
                             ->live()
                             ->columnSpanFull()
                             ->afterStateUpdated(function (?array $state, Get $get, Set $set): void {
-                                $existing = collect($get('damages') ?? [])
-                                    ->mapWithKeys(fn (array $item): array => [
-                                        (string) ($item['juridical_id'] ?? '') => $item['estimated_cost_of_damages'] ?? null,
-                                    ]);
+                                $state = array_values($state ?? []);
 
-                                $set('damages', collect($state ?? [])
-                                    ->map(fn ($id): array => [
-                                        'juridical_id' => $id,
-                                        'estimated_cost_of_damages' => $existing->get((string) $id),
-                                    ])
+                                $existing = collect($get('damages') ?? [])
+                                    ->keyBy(fn (array $item): string => (string) ($item['juridical_id'] ?? ''));
+
+                                $snapshots = app(CalamityMonitoringService::class)
+                                    ->snapshotEstablishments($state);
+
+                                $set('damages', collect($state)
+                                    ->map(function ($id) use ($existing, $snapshots): array {
+                                        $current = $existing->get((string) $id);
+
+                                        return [
+                                            'juridical_id' => $id,
+                                            'juridical_name' => $snapshots[$id]['name'] ?? $id,
+                                            'barangay' => $snapshots[$id]['barangay'] ?? null,
+                                            'estimated_cost_of_damages' => is_array($current)
+                                                ? ($current['estimated_cost_of_damages'] ?? null)
+                                                : null,
+                                            'photos' => is_array($current)
+                                                ? ($current['photos'] ?? [])
+                                                : [],
+                                        ];
+                                    })
                                     ->values()
                                     ->all());
                             }),
@@ -65,16 +81,24 @@ class CreateIncident extends CreateRecord
                             ->schema([
                                 Hidden::make('juridical_id'),
 
+                                Hidden::make('juridical_name'),
+
+                                Hidden::make('barangay'),
+
                                 Placeholder::make('juridical_label')
                                     ->label('Affected MSME')
-                                    ->content(fn (Get $get): string => Juridical::find($get('juridical_id'))?->name ?? '—'),
+                                    ->content(fn (Get $get): string => $get('juridical_name')
+                                        ?: ($get('juridical_id') ?? '—')),
 
                                 TextInput::make('estimated_cost_of_damages')
                                     ->label('Estimated Cost of Damage')
-                                    ->prefix('₱')
+                                    ->prefix('�,�')
                                     ->numeric()
                                     ->minValue(0)
+                                    ->maxValue(Incident::MAX_ESTIMATED_COST)
                                     ->required(),
+
+                                IncidentForm::photoEvidenceField(),
                             ])
                             ->hidden(fn (Get $get): bool => blank($get('juridical_ids')))
                             ->columnSpanFull(),
@@ -132,7 +156,10 @@ class CreateIncident extends CreateRecord
             $last = $calamity->incident()->create([
                 ...$shared,
                 'juridical_id' => $damage['juridical_id'],
+                'juridical_name' => $damage['juridical_name'] ?? $damage['juridical_id'],
+                'barangay' => $damage['barangay'] ?? null,
                 'estimated_cost_of_damages' => $damage['estimated_cost_of_damages'],
+                'photos' => $damage['photos'] ?? [],
             ]);
         }
 
