@@ -4,13 +4,14 @@ namespace App\Filament\Widgets;
 
 use App\Models\CalamityMonitoring\Calamity;
 use App\Models\CalamityMonitoring\Incident;
-use App\Models\MsmeManagement\Juridical;
 use App\Models\PriceMonitoring\Commodity;
+use App\Models\Training\Training;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class DashboardStatsWidget extends StatsOverviewWidget
 {
@@ -18,64 +19,88 @@ class DashboardStatsWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $totalMsme      = Juridical::count();
-        $activeMsme     = Juridical::where('bus_status', 'ACTIVE')->count();
-        $newThisMonth   = Juridical::where('registration_type', 'NEW')
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
-        $renewalThisMonth = Juridical::where('registration_type', 'RENEWAL')
-            ->whereMonth('created_at', now()->month)
-            ->whereYear('created_at', now()->year)
-            ->count();
+        // ── MSME — from SCIMS API (no local table) ────────────────
+        $msmeStat = Stat::make('Registered MSMEs', 'Live from SCIMS')
+            ->description('View in Business List ↗')
+            ->descriptionIcon(Heroicon::BuildingStorefront)
+            ->color(Color::Red);
 
-        $activeCalamities  = Calamity::count();
-        $totalDamage       = Incident::sum('estimated_cost_of_damages');
-        $affectedMsme      = Incident::distinct('juridical_id')->count('juridical_id');
+        // ── Calamity ──────────────────────────────────────────────
+        $calamityCount = 0;
+        $affectedMsme  = 0;
+        $totalDamage   = 0;
 
-        $totalCommodities  = Commodity::count();
-        $activeCommodities = Commodity::where('is_active', 1)->count();
+        try {
+            if (Schema::hasTable('calamities')) {
+                $calamityCount = Calamity::count();
+            }
+            if (Schema::hasTable('calamity_incidents')) {
+                $affectedMsme = Incident::distinct('juridical_id')->count('juridical_id');
+                $totalDamage  = Incident::sum('estimated_cost_of_damages');
+            }
+        } catch (Throwable) {}
 
-        $geocodedBarangays = DB::table('addresses')
-            ->whereNotNull('barangay')
-            ->where('barangay', '!=', '')
-            ->whereNotNull('latitude')->where('latitude', '!=', 0)
-            ->whereNotNull('longitude')->where('longitude', '!=', 0)
-            ->distinct('barangay')
-            ->count('barangay');
-
-        $activePct = $totalMsme > 0 ? round($activeMsme / $totalMsme * 100, 1) : 0;
-
-        return [
-            Stat::make('Registered MSMEs', number_format($totalMsme))
-                ->description(number_format($newThisMonth).' new · '.number_format($renewalThisMonth).' renewals this month')
-                ->descriptionIcon(Heroicon::BuildingStorefront)
-                ->color(Color::Red),
-
-            Stat::make('Active Businesses', number_format($activeMsme))
-                ->description("{$activePct}% of total registered")
-                ->descriptionIcon(Heroicon::CheckBadge)
-                ->color(Color::Green),
-
-            Stat::make('Calamity Events', number_format($activeCalamities))
-                ->description(number_format($affectedMsme).' affected MSMEs')
+        $calamityStat = Schema::hasTable('calamities')
+            ? Stat::make('Calamity Events', number_format($calamityCount))
+                ->description(number_format($affectedMsme).' affected businesses')
                 ->descriptionIcon(Heroicon::CloudArrowDown)
-                ->color(Color::Amber),
+                ->color(Color::Amber)
+            : Stat::make('Calamity Events', '—')
+                ->description('Module pending setup')
+                ->descriptionIcon(Heroicon::CloudArrowDown)
+                ->color(Color::Gray);
 
-            Stat::make('Total Damage (₱)', '₱'.number_format($totalDamage, 2))
-                ->description('Across all calamity incidents')
+        $damageStat = Schema::hasTable('calamity_incidents')
+            ? Stat::make('Total Damage (₱)', '₱'.number_format($totalDamage, 2))
+                ->description('Estimated across all calamities')
                 ->descriptionIcon(Heroicon::CurrencyDollar)
-                ->color(Color::Orange),
+                ->color(Color::Orange)
+            : Stat::make('Total Damage (₱)', '—')
+                ->description('Module pending setup')
+                ->descriptionIcon(Heroicon::CurrencyDollar)
+                ->color(Color::Gray);
 
-            Stat::make('Monitored Commodities', number_format($totalCommodities))
+        // ── Commodities ───────────────────────────────────────────
+        $totalCommodities  = 0;
+        $activeCommodities = 0;
+
+        try {
+            if (Schema::hasTable('commodities')) {
+                $totalCommodities  = Commodity::count();
+                $activeCommodities = Commodity::where('is_active', 1)->count();
+            }
+        } catch (Throwable) {}
+
+        $commodityStat = Schema::hasTable('commodities')
+            ? Stat::make('Monitored Commodities', number_format($totalCommodities))
                 ->description("{$activeCommodities} active · ".($totalCommodities - $activeCommodities).' inactive')
                 ->descriptionIcon(Heroicon::ArchiveBox)
-                ->color(Color::Blue),
+                ->color(Color::Blue)
+            : Stat::make('Monitored Commodities', '—')
+                ->description('Module pending setup')
+                ->descriptionIcon(Heroicon::ArchiveBox)
+                ->color(Color::Gray);
 
-            Stat::make('Barangays with MSMEs', number_format($geocodedBarangays))
-                ->description('With geocoded business locations')
-                ->descriptionIcon(Heroicon::MapPin)
-                ->color(Color::Purple),
+        // ── Training ──────────────────────────────────────────────
+        $trainingTotal = 0;
+        $trainingYear  = 0;
+
+        try {
+            $trainingTotal = Training::count();
+            $trainingYear  = Training::whereYear('from_date', now()->year)->count();
+        } catch (Throwable) {}
+
+        $trainingStat = Stat::make('Training Records', number_format($trainingTotal))
+            ->description(number_format($trainingYear).' this year')
+            ->descriptionIcon(Heroicon::AcademicCap)
+            ->color(Color::Indigo);
+
+        return [
+            $msmeStat,
+            $calamityStat,
+            $damageStat,
+            $commodityStat,
+            $trainingStat,
         ];
     }
 }

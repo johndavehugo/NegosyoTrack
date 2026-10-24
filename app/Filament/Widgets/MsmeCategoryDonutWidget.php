@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\MsmeManagement\Juridical;
 use Leandrocfe\FilamentApexCharts\Widgets\ApexChartWidget;
 
 class MsmeCategoryDonutWidget extends ApexChartWidget
@@ -11,7 +10,7 @@ class MsmeCategoryDonutWidget extends ApexChartWidget
 
     protected static ?string $heading = 'MSME Category Breakdown';
 
-    protected static ?string $subheading = 'Micro, Small, Medium & Large — by capitalization';
+    protected static ?string $subheading = 'Data available once SCIMS aggregate endpoint is connected';
 
     protected static ?int $sort = 3;
 
@@ -27,26 +26,15 @@ class MsmeCategoryDonutWidget extends ApexChartWidget
             return [];
         }
 
-        $counts = Juridical::selectRaw('category, COUNT(*) as total')
-            ->whereNotNull('category')
-            ->groupBy('category')
-            ->pluck('total', 'category')
-            ->toArray();
-
-        $labels = ['MICRO', 'SMALL', 'MEDIUM', 'LARGE'];
-        $series = array_map(fn ($l) => (int) ($counts[$l] ?? 0), $labels);
-        // Use blue shades matching the existing badge colors in the system
-        $colors = ['#3B82F6', '#2563EB', '#1D4ED8', '#1E3A8A'];
-
         return [
             'chart' => [
                 'type'       => 'donut',
                 'height'     => 300,
                 'fontFamily' => 'inherit',
             ],
-            'series' => $series,
-            'labels' => $labels,
-            'colors' => $colors,
+            'series' => [0, 0, 0, 0],
+            'labels' => ['Micro', 'Small', 'Medium', 'Large'],
+            'colors' => ['#3B82F6', '#2563EB', '#1D4ED8', '#1E3A8A'],
             'legend' => [
                 'position'   => 'bottom',
                 'fontFamily' => 'inherit',
@@ -59,23 +47,23 @@ class MsmeCategoryDonutWidget extends ApexChartWidget
                         'labels' => [
                             'show'  => true,
                             'total' => [
-                                'show'      => true,
-                                'label'     => 'Total',
+                                'show'       => true,
+                                'label'      => 'No data',
                                 'fontFamily' => 'inherit',
                                 'fontWeight' => 700,
-                                'color'     => '#0f172a',
+                                'color'      => '#9ca3af',
+                                'formatter'  => 'function() { return "—" }',
                             ],
                         ],
                     ],
                 ],
             ],
-            'dataLabels' => [
-                'enabled' => true,
-                'style'   => ['fontFamily' => 'inherit', 'fontWeight' => 700],
-            ],
-            'stroke' => ['width' => 2],
-            'tooltip' => [
-                'style' => ['fontFamily' => 'inherit'],
+            'dataLabels' => ['enabled' => false],
+            'stroke'     => ['width' => 2],
+            'tooltip'    => ['enabled' => false],
+            'states'     => [
+                'hover'  => ['filter' => ['type' => 'none']],
+                'active' => ['filter' => ['type' => 'none']],
             ],
         ];
     }

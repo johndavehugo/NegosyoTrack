@@ -8,6 +8,7 @@ use App\Filament\Widgets\IndustryDistributionChartWidget;
 use App\Filament\Widgets\MsmeCategoryDonutWidget;
 use App\Filament\Widgets\MsmeRegistrationChartWidget;
 use App\Filament\Widgets\MsmeStatusDonutWidget;
+use App\Filament\Widgets\TrainingStatsWidget;
 use Filament\Pages\Dashboard as BaseDashboard;
 
 class Dashboard extends BaseDashboard
@@ -25,6 +26,7 @@ class Dashboard extends BaseDashboard
             IndustryDistributionChartWidget::class,
             MsmeStatusDonutWidget::class,
             CalamityDamageChartWidget::class,
+            TrainingStatsWidget::class,
         ];
     }
 
