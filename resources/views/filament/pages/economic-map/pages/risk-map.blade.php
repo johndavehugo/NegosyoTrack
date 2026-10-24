@@ -3,10 +3,14 @@
     @include('filament.pages.economic-map.partials.controls')
 
     @php
-        $heatGradient = 'linear-gradient(90deg, '.collect(config('economic-map.heat_ramp', []))
-            ->sortBy('stop')
+        $heatRamp = collect(config('economic-map.heat_ramp', []))->sortBy('stop');
+        $heatGradient = 'linear-gradient(90deg, '.$heatRamp
             ->map(fn (array $stop): string => sprintf('%s %s%%', $stop['color'], round($stop['stop'] * 100, 2)))
             ->implode(', ').')';
+        $heatDefaults = array_merge(
+            ['radius' => 55, 'opacity' => 0.95, 'intensity' => 1.5],
+            config('economic-map.heat_defaults', []),
+        );
     @endphp
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -82,11 +86,11 @@
                 <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
                     <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Reading the map</p>
                     <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat blur</span> — risk intensity: blue is least risk-prone, red is most risk-prone</li>
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Barangay dot</span> — the barangay's exact risk band, from exposure × historical damage</li>
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Blue pin</span> — an individual business; pins sharing the same saved coordinate are fanned out for visibility</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat blur</span> — risk intensity: green is least risk-prone, yellow is moderate, red is most risk-prone</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat only</span> — no business pins or barangay dots are drawn, so the colour is the whole story</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat panel</span> — adjust radius, opacity, and intensity, or reset to the tuned defaults</li>
                     </ul>
-                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Click a barangay dot for its risk breakdown, or a blue pin for the business's exact location.</p>
+                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Search for a barangay to fly there, or pick a Calamity Event to recompute the heat.</p>
                 </div>
 
                 @include('filament.pages.economic-map.partials.summary-card')
@@ -101,20 +105,98 @@
                     </div>
                     <div class="relative md:min-h-0 md:flex-1">
                         <div id="risk-map" wire:ignore class="h-[60vh] w-full md:h-full"></div>
-                        <div class="absolute bottom-10 right-3 rounded-lg bg-white/95 p-3 text-xs shadow-lg dark:bg-gray-900/95">
-                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Intensity</p>
-                            <div class="h-2 w-36 rounded-full" style="background: {{ $heatGradient }};"></div>
-                            <div class="mt-0.5 flex justify-between text-[10px] text-gray-400">
-                                <span>Least risk-prone</span>
-                                <span>Risk-prone</span>
-                            </div>
-                            <p class="mb-1.5 mt-2.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Level</p>
-                            @foreach (config('economic-map.risk_bands', []) as $band)
-                                <div class="flex items-center gap-2 py-0.5 text-gray-600 dark:text-gray-300">
-                                    <span class="h-2.5 w-2.5 rounded-full" style="background: {{ $band['color'] }};"></span>
-                                    {{ $band['label'] }}
+
+                        {{-- Maptive-style heat controls. wire:ignore keeps the
+                             slider values while Livewire refreshes the heat. --}}
+                        <div
+                            id="risk-heat-panel"
+                            data-heat-panel
+                            wire:ignore
+                            class="absolute right-3 top-3 w-56 overflow-hidden rounded-lg bg-white/95 text-xs shadow-lg ring-1 ring-black/5 backdrop-blur sm:w-64 dark:bg-gray-900/95 dark:ring-white/10"
+                        >
+                            <div class="flex items-center justify-between border-b border-gray-100 px-3 py-2 dark:border-white/10">
+                                <p class="text-xs font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Heat Map</p>
+                                <div class="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        data-heat-reset
+                                        class="text-[10px] font-semibold uppercase tracking-wide text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                                    >Reset</button>
+                                    <button
+                                        type="button"
+                                        data-heat-toggle
+                                        aria-expanded="true"
+                                        aria-controls="risk-heat-controls"
+                                        aria-label="Collapse heat controls"
+                                        class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                                    >
+                                        <span data-heat-toggle-icon>−</span>
+                                    </button>
                                 </div>
-                            @endforeach
+                            </div>
+
+                            <div id="risk-heat-controls" data-heat-body class="space-y-3 p-3">
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <label for="heat-radius" class="font-medium text-gray-600 dark:text-gray-300">Radius</label>
+                                        <output for="heat-radius" data-heat-output="radius" class="font-semibold text-gray-500 dark:text-gray-400">{{ (int) $heatDefaults['radius'] }} px</output>
+                                    </div>
+                                    <input
+                                        id="heat-radius"
+                                        data-heat="radius"
+                                        type="range"
+                                        min="24"
+                                        max="140"
+                                        step="1"
+                                        value="{{ (int) $heatDefaults['radius'] }}"
+                                        class="mt-1 w-full cursor-pointer accent-red-600"
+                                    >
+                                </div>
+
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <label for="heat-opacity" class="font-medium text-gray-600 dark:text-gray-300">Opacity</label>
+                                        <output for="heat-opacity" data-heat-output="opacity" class="font-semibold text-gray-500 dark:text-gray-400">{{ (int) round($heatDefaults['opacity'] * 100) }}%</output>
+                                    </div>
+                                    <input
+                                        id="heat-opacity"
+                                        data-heat="opacity"
+                                        type="range"
+                                        min="0.15"
+                                        max="1"
+                                        step="0.05"
+                                        value="{{ $heatDefaults['opacity'] }}"
+                                        class="mt-1 w-full cursor-pointer accent-red-600"
+                                    >
+                                </div>
+
+                                <div>
+                                    <div class="flex items-center justify-between">
+                                        <label for="heat-intensity" class="font-medium text-gray-600 dark:text-gray-300">Intensity</label>
+                                        <output for="heat-intensity" data-heat-output="intensity" class="font-semibold text-gray-500 dark:text-gray-400">{{ (int) round($heatDefaults['intensity'] * 100) }}%</output>
+                                    </div>
+                                    <input
+                                        id="heat-intensity"
+                                        data-heat="intensity"
+                                        type="range"
+                                        min="0.2"
+                                        max="2"
+                                        step="0.05"
+                                        value="{{ $heatDefaults['intensity'] }}"
+                                        class="mt-1 w-full cursor-pointer accent-red-600"
+                                    >
+                                </div>
+
+                                <div class="border-t border-gray-100 pt-2 dark:border-white/10">
+                                    <p class="mb-1 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Intensity</p>
+                                    <div class="h-2 w-full rounded-full" style="background: {{ $heatGradient }};"></div>
+                                    <div class="mt-0.5 flex justify-between text-[10px] text-gray-400">
+                                        <span>Low</span>
+                                        <span>Medium</span>
+                                        <span>High</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -123,20 +205,19 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Heat blur shows risk intensity — red areas are risk-prone, blue areas are least risk-prone. Barangay dot colour is the exact risk band. Blue pins mark every business with a set location from its exact saved coordinates, independent of the heat layer; pins sharing the same coordinate are fanned out and popups show the exact coordinates.',
+        'slot' => 'The risk map is heat-only: no business pins or barangay dots are drawn. Green areas are least risk-prone, yellow moderate, and red most risk-prone. Use the Heat Map panel to adjust radius, opacity, and intensity, or reset to the tuned defaults. Search and the Calamity Event filter still drive the heat.',
     ])
 
     <script type="module">
         import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
 
         let barangays = @js($barangays);
-        let allPins = @js($mapPins);
         let bounds = @js($bounds);
         const basemap = @js(config('economic-map.basemap'));
         const heatRamp = @js(config('economic-map.heat_ramp'));
+        const heatDefaults = @js($heatDefaults);
+        const heatSettings = { ...heatDefaults };
         const el = document.getElementById('risk-map');
-
-        @include('filament.pages.economic-map.partials.pin-layer')
 
         const norm = (e) => e?.detail?.[0] ?? e?.detail ?? {};
         const asList = (value) => {
@@ -145,59 +226,87 @@
 
             return null;
         };
-        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
-        }[char]));
-
-        @include('filament.pages.economic-map.partials.pin-popup')
 
         let map = null;
-        let popup = null;
-        let pinPopup = null;
-
-        const money = (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         // One point per barangay centroid, weighted by its normalized risk
         // score, so the heat blur reads as risk intensity instead of raw
-        // MSME density. The 0.2 floor keeps least-risk barangays visibly
-        // blue rather than fading to nothing.
+        // MSME density. The 0.25 floor keeps least-risk barangays visibly
+        // green rather than fading to nothing.
         const heatFeatures = () => ({
             type: 'FeatureCollection',
             features: barangays.map((b) => ({
                 type: 'Feature',
-                properties: { weight: 0.2 + 0.8 * (b.score ?? 0) },
+                properties: { weight: 0.25 + 0.75 * (b.score ?? 0) },
                 geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
             })),
         });
-
-        const centerFeatures = () => ({
-            type: 'FeatureCollection',
-            features: barangays.map((b) => ({
-                type: 'Feature',
-                properties: {
-                    barangay: b.barangay, score: b.score, color: b.color, level: b.level,
-                    count: b.business_count, exposure: b.exposure,
-                    affected: b.affected_count, damage: b.total_damage,
-                },
-                geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
-            })),
-        });
-
-        const pinFeatures = () => (allPins ?? []).map((p) => ({
-            type: 'Feature',
-            properties: {
-                name: p.name, entity_no: p.entity_no, street: p.street,
-                barangay: p.barangay, industry: p.industry, sector: p.sector,
-                color: p.color, lat: p.lat, lng: p.lng,
-                offset: Array.isArray(p.offset) ? p.offset : [0, 0],
-            },
-            // Exact stored coordinate — never the barangay average.
-            // The offset only moves the rendered icon, not this geometry.
-            geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
-        }));
 
         const heatColor = ['interpolate', ['linear'], ['heatmap-density']];
         for (const stop of [...heatRamp].sort((a, b) => a.stop - b.stop)) heatColor.push(stop.stop, stop.color);
+
+        // The sliders drive a base value that still scales with zoom, so the
+        // blobs stay soft on the city view and do not swallow the streets
+        // when the user zooms into a barangay.
+        const heatRadiusExpression = (base) => ['interpolate', ['linear'], ['zoom'], 9, base * 0.65, 12, base * 0.9, 14, base * 1.1, 17, base * 1.4];
+        const heatOpacityExpression = (base) => ['interpolate', ['linear'], ['zoom'], 10, base, 13, base * 0.85, 15, base * 0.65, 17, base * 0.4];
+        const heatIntensityExpression = (base) => ['interpolate', ['linear'], ['zoom'], 9, base * 0.75, 13, base, 17, base * 1.15];
+
+        const heatPanel = document.querySelector('[data-heat-panel]');
+        const heatInputs = heatPanel ? [...heatPanel.querySelectorAll('[data-heat]')] : [];
+
+        const formatHeatValue = (key, value) => key === 'radius'
+            ? `${Math.round(value)} px`
+            : `${Math.round(value * 100)}%`;
+
+        const syncHeatControls = () => {
+            for (const input of heatInputs) {
+                const key = input.dataset.heat;
+                const value = heatSettings[key];
+                input.value = value;
+
+                const output = heatPanel?.querySelector(`[data-heat-output="${key}"]`);
+                if (output) output.textContent = formatHeatValue(key, value);
+            }
+        };
+
+        function applyHeatPaint() {
+            if (! map || ! map.getLayer('heat')) return;
+
+            map.setPaintProperty('heat', 'heatmap-radius', heatRadiusExpression(heatSettings.radius));
+            map.setPaintProperty('heat', 'heatmap-opacity', heatOpacityExpression(heatSettings.opacity));
+            map.setPaintProperty('heat', 'heatmap-intensity', heatIntensityExpression(heatSettings.intensity));
+        }
+
+        for (const input of heatInputs) {
+            input.addEventListener('input', () => {
+                const key = input.dataset.heat;
+                heatSettings[key] = Number(input.value);
+                syncHeatControls();
+                applyHeatPaint();
+            });
+        }
+
+        syncHeatControls();
+
+        heatPanel?.querySelector('[data-heat-reset]')?.addEventListener('click', () => {
+            Object.assign(heatSettings, heatDefaults);
+            syncHeatControls();
+            applyHeatPaint();
+        });
+
+        const heatBody = heatPanel?.querySelector('[data-heat-body]');
+        const heatToggle = heatPanel?.querySelector('[data-heat-toggle]');
+
+        heatToggle?.addEventListener('click', () => {
+            if (! heatBody) return;
+
+            const collapsed = heatBody.classList.toggle('hidden');
+            heatToggle.setAttribute('aria-expanded', String(! collapsed));
+
+            const icon = heatToggle.querySelector('[data-heat-toggle-icon]');
+            if (icon) icon.textContent = collapsed ? '+' : '−';
+        });
 
         function boot() {
             if (! el || map) return;
@@ -231,68 +340,15 @@
                     id: 'heat', type: 'heatmap', source: 'heat', maxzoom: 17,
                     paint: {
                         // Points carry their barangay's risk score as weight, so
-                        // blob colour reads as risk intensity: blue = least
-                        // risk-prone, red = most. Exact bands stay on the dots.
+                        // blob colour reads as risk intensity: green = least
+                        // risk-prone, red = most.
                         'heatmap-weight': ['get', 'weight'],
-                        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 18, 12, 30, 14, 46, 16, 64],
-                        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.5, 13, 0.9, 16, 1.4],
-                        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.95, 14, 0.55, 17, 0.25],
+                        'heatmap-radius': heatRadiusExpression(heatSettings.radius),
+                        'heatmap-opacity': heatOpacityExpression(heatSettings.opacity),
+                        'heatmap-intensity': heatIntensityExpression(heatSettings.intensity),
                         'heatmap-color': heatColor,
                     },
                 });
-
-                map.addSource('centers', { type: 'geojson', data: centerFeatures() });
-                map.addLayer({
-                    id: 'centers', type: 'circle', source: 'centers',
-                    paint: {
-                        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 5.5, 14, 8.5],
-                        'circle-color': ['get', 'color'],
-                        'circle-opacity': 0.95,
-                        'circle-stroke-width': 1.5,
-                        'circle-stroke-color': '#ffffff',
-                    },
-                });
-
-                // Every exact set-location pin, visible on load above the
-                // aggregate barangay dots.
-                emapAddPinLayer(map, pinFeatures());
-
-                map.on('click', 'centers', (e) => {
-                    // Prefer the exact business pin when it overlaps a dot.
-                    if (map.queryRenderedFeatures(e.point, { layers: ['pins'] }).length > 0) return;
-
-                    const p = e.features?.[0]?.properties;
-                    if (! p) return;
-
-                    if (! popup) popup = new maplibregl.Popup({ closeButton: true, maxWidth: '280px' });
-
-                    popup.setLngLat(e.lngLat).setHTML(
-                        `<div style="font-size:12px;line-height:1.5;min-width:180px;">` +
-                        `<p style="font-weight:700;font-size:13px;">${p.barangay}</p>` +
-                        `<p><span style="display:inline-block;width:8px;height:8px;border-radius:9999px;background:${p.color};margin-right:4px;"></span><strong>${p.level}</strong> · score ${p.score}</p>` +
-                        `<p>Businesses: <strong>${p.count}</strong> (${(p.exposure * 100).toFixed(1)}% exposure)</p>` +
-                        `<p>Affected before: <strong>${p.affected}</strong></p>` +
-                        `<p>Damage recorded: <strong>${money(p.damage)}</strong></p>` +
-                        `</div>`
-                    ).addTo(map);
-
-                    map.flyTo({ center: e.lngLat, zoom: 14 });
-
-                    if (window.Livewire) window.Livewire.dispatch('emap-select-barangay', { barangay: p.barangay });
-                });
-                map.on('mouseenter', 'centers', () => (map.getCanvas().style.cursor = 'pointer'));
-                map.on('mouseleave', 'centers', () => (map.getCanvas().style.cursor = ''));
-
-                map.on('click', 'pins', (e) => {
-                    const p = e.features?.[0]?.properties;
-                    if (! p) return;
-
-                    if (! pinPopup) pinPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px' });
-
-                    pinPopup.setLngLat([Number(p.lng), Number(p.lat)]).setHTML(emapPinPopupHtml(p, true)).addTo(map);
-                });
-                map.on('mouseenter', 'pins', () => (map.getCanvas().style.cursor = 'pointer'));
-                map.on('mouseleave', 'pins', () => (map.getCanvas().style.cursor = ''));
 
                 if (bounds) map.fitBounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]], { padding: 40 });
             });
@@ -312,28 +368,15 @@
         window.addEventListener('emap-risk-updated', (e) => {
             const d = norm(e);
             const nextBarangays = asList(d.barangays);
-            const nextPins = asList(d.pins);
-            const nextBounds = asList(d.bounds);
 
             if (nextBarangays) barangays = nextBarangays;
-            if (nextBounds?.length === 4) bounds = nextBounds;
-
             if (! map) return;
 
-            // Refresh the risk layers and pins in place. Reloading the page
-            // would reset the Calamity Event select to "All events".
+            // Refresh the heat layer in place. Reloading the page would reset
+            // the Calamity Event select and the heat panel sliders.
             map.getSource('heat')?.setData(heatFeatures());
-            map.getSource('centers')?.setData(centerFeatures());
-
-            if (nextPins) {
-                allPins = nextPins;
-
-                if (map.getSource('pins')) emapRenderPins(map, pinFeatures());
-            }
-
-            popup?.remove();
-            pinPopup?.remove();
         });
+
         document.addEventListener('livewire:navigated', () => boot());
 
         let resizeTimer;

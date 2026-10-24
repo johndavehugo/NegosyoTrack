@@ -53,8 +53,7 @@ class RiskMap extends BaseMapPage
         $service = app(EconomicMapService::class);
 
         $this->loadRiskData($service);
-        $this->bounds = $service->pinBounds();
-        $this->loadMapPins($service);
+        $this->bounds = $service->bounds();
         $this->loadUnsetCount();
     }
 
@@ -78,30 +77,15 @@ class RiskMap extends BaseMapPage
     public function updatedSelectedCalamity(): void
     {
         $service = app(EconomicMapService::class);
-        $previousPins = $this->mapPins;
-        $previousBounds = $this->bounds;
 
         $this->loadRiskData($service);
-        $this->bounds = $service->pinBounds();
-        $this->loadMapPins($service);
 
-        $payload = [
+        // Only the heat layer is drawn on this page, so the payload carries
+        // barangays alone. Bounds do not depend on the selected calamity.
+        $this->dispatch('emap-risk-updated', [
             'calamity_id' => filled($this->selectedCalamity) ? (int) $this->selectedCalamity : null,
             'barangays' => $this->barangays,
-        ];
-
-        // Pins and bounds normally do not depend on the calamity, so only
-        // send them when they actually changed. This keeps the event small
-        // while still refreshing the pin layer after a data sync.
-        if ($this->mapPins !== $previousPins) {
-            $payload['pins'] = $this->mapPins;
-        }
-
-        if ($this->bounds !== $previousBounds) {
-            $payload['bounds'] = $this->bounds;
-        }
-
-        $this->dispatch('emap-risk-updated', $payload);
+        ]);
     }
 
     public function selectedCalamityName(): ?string

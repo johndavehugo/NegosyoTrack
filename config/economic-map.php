@@ -121,17 +121,29 @@ return [
 
     // Risk-intensity ramp for the risk map's heat layer: MapLibre
     // 'heatmap-density' over barangay points weighted by their risk score ->
-    // colour. Blue = least risk-prone, red = most risk-prone. Single source for
-    // the heatmap-color expression and the legend gradient, so they cannot
-    // drift. Stops must stay ascending on [0..1].
+    // colour. Green = least risk-prone, yellow = moderate, red = most
+    // risk-prone. Single source for the heatmap-color expression and the
+    // legend gradient, so they cannot drift. Stops must stay ascending on
+    // [0..1].
     'heat_ramp' => [
-        ['stop' => 0.00, 'color' => 'rgba(30, 64, 175, 0)'],
-        ['stop' => 0.10, 'color' => '#1d4ed8'],
-        ['stop' => 0.30, 'color' => '#0891b2'],
-        ['stop' => 0.50, 'color' => '#16a34a'],
-        ['stop' => 0.70, 'color' => '#ca8a04'],
-        ['stop' => 0.85, 'color' => '#ea580c'],
-        ['stop' => 1.00, 'color' => '#b91c1c'],
+        ['stop' => 0.00, 'color' => 'rgba(0, 200, 83, 0)'],
+        ['stop' => 0.10, 'color' => 'rgba(0, 200, 83, 0.65)'],
+        ['stop' => 0.26, 'color' => '#00c853'],
+        ['stop' => 0.44, 'color' => '#ffeb3b'],
+        ['stop' => 0.60, 'color' => '#ffb300'],
+        ['stop' => 0.76, 'color' => '#ff6d00'],
+        ['stop' => 0.88, 'color' => '#e53935'],
+        ['stop' => 1.00, 'color' => '#b71c1c'],
+    ],
+
+    // Defaults for the risk map's live heat controls. Radius is in screen
+    // pixels at mid zoom and scales with zoom; opacity and intensity are
+    // MapLibre multipliers. Keep both in sync with the slider bounds in the
+    // risk-map blade view.
+    'heat_defaults' => [
+        'radius' => 55,
+        'opacity' => 0.95,
+        'intensity' => 1.5,
     ],
 
     // Canonical 17-sector palette (PSIC-aligned, matches Industries::All()).
