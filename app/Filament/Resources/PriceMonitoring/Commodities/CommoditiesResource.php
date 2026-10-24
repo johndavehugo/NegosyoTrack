@@ -4,10 +4,8 @@ namespace App\Filament\Resources\PriceMonitoring\Commodities;
 
 use App\Filament\Resources\PriceMonitoring\Commodities\Pages\ManageCommodities;
 use App\Models\PriceMonitoring\Commodity;
+use App\Services\PriceMonitoringService;
 use BackedEnum;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
-use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -56,9 +54,15 @@ class CommoditiesResource extends Resource
 
                 Select::make('juridical_id')
                     ->label('Establishment')
-                    ->relationship('juridical', 'name')
                     ->searchable()
-                    ->preload(),
+                    ->nullable()
+                    ->placeholder('Select an establishment')
+                    ->getSearchResultsUsing(
+                        fn (string $search): array => app(PriceMonitoringService::class)->searchEstablishments($search)
+                    )
+                    ->getOptionLabelUsing(
+                        fn (?string $value): ?string => app(PriceMonitoringService::class)->resolveEstablishmentName($value)
+                    ),
 
                 Repeater::make('variants')
                     ->relationship('variants')
@@ -97,10 +101,36 @@ class CommoditiesResource extends Resource
                 TextColumn::make('category.name')
                     ->sortable()
                     ->label('Category'),
-                TextColumn::make('juridical.name')
+                TextColumn::make('juridical_id')
                     ->label('Establishment')
-                    ->toggleable()
-                    ->sortable(),
+                    ->state(function (Commodity $record): ?string {
+                        return $record->juridical_id;
+                    })
+                    ->formatStateUsing(function (?string $state, Commodity $record) {
+                        if (blank($state)) {
+                            return '—';
+                        }
+
+                        // Batch-resolve all visible juridical_ids once per table render
+                        // by leveraging a shared static cache for the current request.
+                        static $resolved = null;
+
+                        if ($resolved === null) {
+                            $allIds = Commodity::whereNotNull('juridical_id')
+                                ->pluck('juridical_id')
+                                ->unique()
+                                ->values()
+                                ->all();
+
+                            $resolved = $allIds
+                                ? app(PriceMonitoringService::class)->resolveEstablishmentNames($allIds)
+                                : [];
+                        }
+
+                        return $resolved[$state] ?? $state;
+                    })
+                    ->placeholder('—')
+                    ->toggleable(),
                 TextColumn::make('variants_count')
                     ->counts('variants')
                     ->label('Variants'),

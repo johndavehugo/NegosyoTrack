@@ -10,6 +10,11 @@ class Agency extends Model
 
     public function categories()
     {
-        return $this->hasOne(Category::class);
+        return $this->hasMany(Category::class);
+    }
+
+    public function priceLogs()
+    {
+        return $this->hasMany(PriceLog::class, 'monitored_by_agency_id');
     }
 }

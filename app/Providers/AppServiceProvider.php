@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Models\PriceMonitoring\CommodityVariant;
+use App\Observers\PriceMonitoring\CommodityVariantObserver;
 use Filament\Support\Facades\FilamentColor;
 use Illuminate\Support\ServiceProvider;
 
@@ -20,6 +22,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        CommodityVariant::observe(CommodityVariantObserver::class);
+
         FilamentColor::register([
             'blue-badge-1' => [
                 50 => 'oklch(0.96 0.06 245)',
