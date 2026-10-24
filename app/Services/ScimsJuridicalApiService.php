@@ -65,9 +65,9 @@ class ScimsJuridicalApiService
 
         $this->usedStaleCache = false;
 
-        $cached = Cache::get(static::ALL_BUSINESSES_CACHE_KEY);
+        $cached = $this->decodeBusinesses(Cache::get(static::ALL_BUSINESSES_CACHE_KEY));
 
-        if (is_array($cached) && $cached !== []) {
+        if ($cached !== []) {
             return $this->allBusinesses = collect($cached);
         }
 
@@ -76,28 +76,68 @@ class ScimsJuridicalApiService
         if ($businesses->isNotEmpty()) {
             Cache::put(
                 static::ALL_BUSINESSES_CACHE_KEY,
-                $businesses->all(),
+                $this->encodeBusinesses($businesses->all()),
                 now()->addHours(static::ALL_BUSINESSES_CACHE_TTL_HOURS),
             );
 
             Cache::put(
                 static::ALL_BUSINESSES_STALE_CACHE_KEY,
-                $businesses->all(),
+                $this->encodeBusinesses($businesses->all()),
                 now()->addDays(static::ALL_BUSINESSES_STALE_CACHE_TTL_DAYS),
             );
 
             return $this->allBusinesses = $businesses;
         }
 
-        $stale = Cache::get(static::ALL_BUSINESSES_STALE_CACHE_KEY);
+        $stale = $this->decodeBusinesses(Cache::get(static::ALL_BUSINESSES_STALE_CACHE_KEY));
 
-        if (is_array($stale) && $stale !== []) {
+        if ($stale !== []) {
             $this->usedStaleCache = true;
 
             return $this->allBusinesses = collect($stale);
         }
 
         return $this->allBusinesses = $businesses;
+    }
+
+    /**
+     * Compress the registry so it fits within small MySQL `max_allowed_packet` limits.
+     *
+     * @param  array<int, array<string, mixed>>  $businesses
+     */
+    protected function encodeBusinesses(array $businesses): string
+    {
+        return base64_encode(gzcompress(serialize($businesses), 6));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function decodeBusinesses(mixed $payload): array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        if (! is_string($payload) || $payload === '') {
+            return [];
+        }
+
+        $compressed = base64_decode($payload, true);
+
+        if ($compressed === false) {
+            return [];
+        }
+
+        $serialized = @gzuncompress($compressed);
+
+        if ($serialized === false) {
+            return [];
+        }
+
+        $businesses = @unserialize($serialized);
+
+        return is_array($businesses) ? $businesses : [];
     }
 
     /**
@@ -139,23 +179,38 @@ class ScimsJuridicalApiService
 
             $lastPage = (int) $first->json('meta.last_page', 1);
 
-            $responses = $lastPage > 1
-                ? Http::pool(function (Pool $pool) use ($lastPage, $parameters): void {
-                    foreach (range(2, $lastPage) as $page) {
+            $businesses = $this->normalizeBusinesses($first->json('data', []));
+
+            for ($start = 2; $start <= $lastPage; $start += 5) {
+                $responses = Http::pool(function (Pool $pool) use ($start, $lastPage, $parameters): void {
+                    foreach (range($start, min($lastPage, $start + 4)) as $page) {
                         $pool->as((string) $page)
                             ->baseUrl(config('scims.base_url'))
                             ->timeout(30)
                             ->get('juridical', ['page' => $page, ...$parameters]);
                     }
-                })
-                : [];
+                });
+
+                foreach ($responses as $response) {
+                    if ($response instanceof Response && $response->successful()) {
+                        $businesses = [...$businesses, ...$this->normalizeBusinesses($response->json('data', []))];
+                    }
+                }
+            }
         } catch (\Throwable) {
             return collect();
         }
 
-        return collect([$first, ...array_values($responses)])
-            ->filter(fn (mixed $response): bool => $response instanceof Response && $response->successful())
-            ->flatMap(fn (Response $response): array => $response->json('data', []))
+        return collect($businesses)->unique('entity_no')->values();
+    }
+
+    /**
+     * @param  array<int, mixed>  $items
+     * @return array<int, array{entity_no: string, juri_name: string, barangay: ?string, street: ?string, line_of_industry: ?string}>
+     */
+    protected function normalizeBusinesses(array $items): array
+    {
+        return collect($items)
             ->filter(fn (mixed $item): bool => is_array($item) && filled($item['entity_no'] ?? null))
             ->map(fn (array $item): array => [
                 'entity_no' => $item['entity_no'],
@@ -164,7 +219,8 @@ class ScimsJuridicalApiService
                 'street' => $item['street'] ?? null,
                 'line_of_industry' => $item['line_of_industry'] ?? null,
             ])
-            ->values();
+            ->values()
+            ->all();
     }
 
     public function getEmployees(string $entity_no, int $page = 1, int $recordsPerPage = 10, ?string $search = null): LengthAwarePaginator

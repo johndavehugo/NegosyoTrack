@@ -53,7 +53,9 @@ class NegosyotrackPanelProvider extends PanelProvider
                     ->icon(Heroicon::AcademicCap),
 
                 NavigationGroup::make()
-                    ->label('Calamity Monitoring'),
+                    ->label('Calamity Monitoring')
+                    ->icon(Heroicon::Cloud),
+
 
                 NavigationGroup::make()
                     ->label('Price Monitoring')
