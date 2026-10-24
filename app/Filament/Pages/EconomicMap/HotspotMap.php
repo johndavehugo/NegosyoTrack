@@ -47,14 +47,23 @@ class HotspotMap extends BaseMapPage
     protected function loadData(): void
     {
         $service = app(EconomicMapService::class);
-        $hotspots = $service->hotspots();
+        $located = $service->locatedBusinessRows();
+        $hotspots = $service->hotspots($located);
 
         $this->ranked = $hotspots['ranked'];
         $this->total = $hotspots['total'];
         $this->top = $hotspots['top'];
         $this->barangayCount = $hotspots['barangay_count'];
-        $this->bounds = $service->bounds();
+        $this->bounds = $service->pinBounds($located);
         $this->hasData = $this->total > 0;
         $this->barangayOptions = $service->locationOptions()['barangays'];
+        $this->loadMapPins($service);
+        $this->loadUnsetCount();
+    }
+
+    /** Hotspot only plots businesses with a set location. */
+    protected function onlyLocated(): bool
+    {
+        return true;
     }
 }

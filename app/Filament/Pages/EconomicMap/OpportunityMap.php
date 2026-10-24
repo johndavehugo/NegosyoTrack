@@ -54,7 +54,9 @@ class OpportunityMap extends BaseMapPage
         $this->highVeryHigh = $data['high_very_high'];
         $this->highlights = $data['highlights'];
         $this->howCalculated = $data['how_calculated'];
-        $this->bounds = $service->bounds();
+        $this->bounds = $service->pinBounds();
         $this->hasData = count($this->ranked) > 0;
+        $this->loadMapPins($service);
+        $this->loadUnsetCount();
     }
 }

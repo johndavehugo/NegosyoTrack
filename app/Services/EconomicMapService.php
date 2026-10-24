@@ -3,23 +3,36 @@
 namespace App\Services;
 
 use App\Enums\Industries;
+use App\Models\Msme\Location;
 use App\Services\EconomicMap\CalamityFeed;
 use App\Services\EconomicMap\ScimsBusinessClient;
 use Illuminate\Contracts\Cache\Repository as CacheRepository;
 use Illuminate\Support\Facades\Cache;
 use RuntimeException;
+use Throwable;
 
 /**
- * Economic Map data layer. No models — business and address data comes
- * from the SCIMS juridical API (cached), plus reference places via
- * AddressApiService.
+ * Economic Map data layer. Business and address data comes from the SCIMS
+ * juridical API (cached), plus reference places via AddressApiService.
  *
- * SCIMS exposes address text but no latitude/longitude, so aggregate maps
- * plot each barangay at a display-only centre from config/economic-map.php.
- * Individual pins are only rendered for rows with real coordinates.
+ * Individual pins come from coordinates stored in the `locations` table
+ * (set from the Business Locations page, keyed by SCIMS entity number);
+ * those saved coordinates always win over any GPS value returned by SCIMS.
+ * Businesses without stored coordinates still count toward the aggregate
+ * risk and opportunity views, which plot each barangay at a display-only
+ * centre from config/economic-map.php.
  */
 class EconomicMapService
 {
+    /** @var array<string, array{0: float, 1: float}>|null */
+    protected ?array $locationCoordinates = null;
+
+    /** @var array<string, Location>|null */
+    protected ?array $storedLocations = null;
+
+    /** @var array<int, array>|null */
+    protected ?array $allLocatedPins = null;
+
     /**
      * Industry keyword rules evaluated in order. First match wins,
      * mirroring the legacy classifier. Keys match Industries::Array().
@@ -249,24 +262,179 @@ class EconomicMapService
             ?? config('economic-map.sector_fallback_color', '#6c757d');
     }
 
-    /** Every valid SCIMS business row, geocoded or not. */
+    /** Every valid SCIMS business row, with stored coordinates merged in. */
     public function businessRows(?array $rows = null): array
     {
         $rows ??= $this->businessList();
+        $coordinates = $this->locationCoordinates();
 
-        return array_values(array_filter($rows, 'is_array'));
+        return array_values(array_map(
+            fn (array $row): array => $this->applyStoredCoordinates($row, $coordinates),
+            array_filter($rows, 'is_array'),
+        ));
     }
 
     /** Rows whose business address carries real coordinates. */
     public function geocodedRows(?array $rows = null): array
     {
-        $rows ??= $this->businessList();
+        return array_values(array_filter(
+            $this->businessRows($rows),
+            fn (array $row): bool => static::hasCoords(
+                $row['juridical']['latitude'] ?? null,
+                $row['juridical']['longitude'] ?? null,
+            ),
+        ));
+    }
+
+    /**
+     * Business rows whose SCIMS entity number exists in the `locations`
+     * table. This is the "set" dataset used by maps that must ignore
+     * businesses the user has not located yet.
+     *
+     * @return array<int, array>
+     */
+    public function locatedBusinessRows(?array $rows = null): array
+    {
+        $stored = $this->storedLocations();
 
         return array_values(array_filter(
-            $rows,
-            fn (mixed $row): bool => is_array($row)
-                && static::hasCoords($row['juridical']['latitude'] ?? null, $row['juridical']['longitude'] ?? null),
+            $this->businessRows($rows),
+            fn (array $row): bool => isset($stored[trim((string) ($row['juridical']['entity_no'] ?? ''))]),
         ));
+    }
+
+    /**
+     * Every `locations` row keyed by trimmed SCIMS entity number.
+     *
+     * One query per request feeds both the map pins and the set/unset
+     * checks below, regardless of whether the row has usable coordinates.
+     *
+     * @return array<string, Location>
+     */
+    protected function storedLocations(): array
+    {
+        if ($this->storedLocations !== null) {
+            return $this->storedLocations;
+        }
+
+        $locations = [];
+
+        try {
+            foreach (Location::query()->get(['id', 'api_entity_no', 'latitude', 'longitude']) as $location) {
+                $entityNo = trim((string) $location->api_entity_no);
+
+                if ($entityNo !== '') {
+                    $locations[$entityNo] = $location;
+                }
+            }
+        } catch (Throwable) {
+            // The locations table may not be migrated yet; aggregate maps
+            // still render from SCIMS rows and barangay centres.
+            $locations = [];
+        }
+
+        return $this->storedLocations = $locations;
+    }
+
+    /**
+     * Coordinates stored in the `locations` table, keyed by SCIMS entity
+     * number. SCIMS itself carries address text only, so this is the
+     * Economic Map's source of real business pins.
+     *
+     * @return array<string, array{0: float, 1: float}>
+     */
+    protected function locationCoordinates(): array
+    {
+        if ($this->locationCoordinates !== null) {
+            return $this->locationCoordinates;
+        }
+
+        $coordinates = [];
+
+        foreach ($this->storedLocations() as $entityNo => $location) {
+            if (! static::hasCoords($location->latitude, $location->longitude)) {
+                continue;
+            }
+
+            $coordinates[$entityNo] = [
+                (float) $location->latitude,
+                (float) $location->longitude,
+            ];
+        }
+
+        return $this->locationCoordinates = $coordinates;
+    }
+
+    /**
+     * SCIMS businesses that have no `locations` row.
+     *
+     * Existence of the entity number is the only test here: zero or null
+     * coordinates do not make a business unset.
+     *
+     * @return array<int, array{entity_no: string, name: string|null, barangay: string|null, street: string|null}>
+     */
+    public function unsetLocations(?string $search = null, ?array $rows = null): array
+    {
+        $stored = $this->storedLocations();
+        $search = mb_strtolower(trim((string) $search));
+        $unset = [];
+
+        foreach ($this->businessRows($rows) as $row) {
+            $juridical = $row['juridical'] ?? [];
+            $entityNo = trim((string) ($juridical['entity_no'] ?? ''));
+
+            if ($entityNo === '' || isset($stored[$entityNo])) {
+                continue;
+            }
+
+            $name = $juridical['name'] ?? null;
+            $barangay = $juridical['barangay'] ?? null;
+            $street = $juridical['street'] ?? null;
+
+            if ($search !== '') {
+                $haystack = mb_strtolower(implode(' ', array_filter([$entityNo, $name, $barangay, $street])));
+
+                if (! str_contains($haystack, $search)) {
+                    continue;
+                }
+            }
+
+            $unset[] = [
+                'entity_no' => $entityNo,
+                'name' => $name,
+                'barangay' => $barangay,
+                'street' => $street,
+            ];
+        }
+
+        return $unset;
+    }
+
+    /** Number of SCIMS businesses whose entity number has no `locations` row. */
+    public function unsetCount(?array $rows = null): int
+    {
+        return count($this->unsetLocations(null, $rows));
+    }
+
+    /**
+     * @param  array<string, array{0: float, 1: float}>  $coordinates
+     */
+    protected function applyStoredCoordinates(array $row, array $coordinates): array
+    {
+        $entityNo = trim((string) ($row['juridical']['entity_no'] ?? ''));
+        $pair = $coordinates[$entityNo] ?? null;
+
+        // A location saved on the Business Locations page is manually
+        // verified, so it is authoritative. SCIMS coordinates are only a
+        // fallback for rows the user has not located yet.
+        if ($pair === null) {
+            return $row;
+        }
+
+        $row['juridical']['latitude'] = $pair[0];
+        $row['juridical']['longitude'] = $pair[1];
+
+        return $row;
     }
 
     /**
@@ -359,9 +527,9 @@ class EconomicMapService
 
     // ── Hotspot ───────────────────────────────────────────────────
 
-    public function hotspots(): array
+    public function hotspots(?array $rows = null): array
     {
-        $groups = $this->groupByBarangay();
+        $groups = $this->groupByBarangay($rows);
         $total = 0;
         $max = 1;
 
@@ -398,9 +566,9 @@ class EconomicMapService
 
     // ── Distribution ────────────────────────────────────────────
 
-    public function distribution(): array
+    public function distribution(?array $rows = null): array
     {
-        $groups = $this->groupByBarangay();
+        $groups = $this->groupByBarangay($rows);
         $total = 0;
         $sectorTotals = array_fill_keys(static::sectors(), 0);
 
@@ -551,6 +719,7 @@ class EconomicMapService
     protected function pinRow(array $row): array
     {
         $juridical = $row['juridical'] ?? [];
+        $sector = $this->categorizeIndustry($juridical['line_of_industry'] ?? null);
 
         return [
             'name' => $juridical['name'] ?? '—',
@@ -558,7 +727,8 @@ class EconomicMapService
             'street' => $juridical['street'] ?? null,
             'barangay' => $juridical['barangay'] ?? null,
             'industry' => $juridical['line_of_industry'] ?? null,
-            'sector' => $this->categorizeIndustry($juridical['line_of_industry'] ?? null),
+            'sector' => $sector,
+            'color' => $this->sectorColor($sector),
             'msme_category' => $juridical['msme_category'] ?? null,
             'is_new' => static::isNew($row),
             'lat' => (float) ($juridical['latitude'] ?? 0),
@@ -566,44 +736,126 @@ class EconomicMapService
         ];
     }
 
-    /** Geocoded businesses in one barangay (normalized match). */
-    public function barangayBusinesses(string $barangay): array
+    /**
+     * One exact pin per business whose entity number exists in the
+     * `locations` table.
+     *
+     * Coordinates are read straight from the stored location record — never
+     * averaged with other rows and never replaced by a barangay centre — so
+     * each pin lands exactly where the user set it. Rows without usable
+     * coordinates are skipped rather than plotted at (0, 0).
+     *
+     * @return array<int, array>
+     */
+    public function locatedPins(?array $rows = null): array
+    {
+        if ($rows === null && $this->allLocatedPins !== null) {
+            return $this->allLocatedPins;
+        }
+
+        $pins = [];
+
+        foreach ($this->businessRows($rows) as $row) {
+            $juridical = $row['juridical'] ?? [];
+            $entityNo = trim((string) ($juridical['entity_no'] ?? ''));
+            $location = $this->storedLocations()[$entityNo] ?? null;
+
+            if ($location === null || ! static::hasCoords($location->latitude, $location->longitude)) {
+                continue;
+            }
+
+            $pin = $this->pinRow($row);
+            $pin['lat'] = (float) $location->latitude;
+            $pin['lng'] = (float) $location->longitude;
+
+            $pins[] = $pin;
+        }
+
+        return $rows === null ? ($this->allLocatedPins = $pins) : $pins;
+    }
+
+    /**
+     * Add display-only pixel offsets to pins that share the same saved
+     * coordinate.
+     *
+     * The stored lat/lng values stay untouched. The offsets only move the
+     * rendered icon so coincident pins do not hide one another; each pin's
+     * popup still reports the exact saved coordinate.
+     *
+     * @param  array<int, array>  $pins
+     * @return array<int, array>
+     */
+    public function displayPins(array $pins): array
+    {
+        $groups = [];
+
+        foreach ($pins as $index => $pin) {
+            $key = sprintf(
+                '%.6F,%.6F',
+                (float) ($pin['lat'] ?? 0),
+                (float) ($pin['lng'] ?? 0),
+            );
+
+            $groups[$key][] = $index;
+        }
+
+        $radius = (float) config('economic-map.overlap_pin_radius_px', 12);
+        $maxRadius = (float) config('economic-map.overlap_pin_max_radius_px', 24);
+
+        foreach ($groups as $indexes) {
+            if (count($indexes) === 1) {
+                $pins[$indexes[0]]['offset'] = [0.0, 0.0];
+
+                continue;
+            }
+
+            usort($indexes, function (int $a, int $b) use ($pins): int {
+                return strcmp(
+                    (string) ($pins[$a]['entity_no'] ?? ''),
+                    (string) ($pins[$b]['entity_no'] ?? ''),
+                ) ?: ($a <=> $b);
+            });
+
+            $count = count($indexes);
+            $groupRadius = min($maxRadius, $radius + (($count - 2) * 2));
+
+            foreach ($indexes as $position => $index) {
+                $angle = (2 * M_PI * $position) / $count;
+
+                $pins[$index]['offset'] = [
+                    round(cos($angle) * $groupRadius, 2),
+                    round(sin($angle) * $groupRadius, 2),
+                ];
+            }
+        }
+
+        return array_values($pins);
+    }
+
+    /** Exact set-location pins in one barangay (normalized match). */
+    public function barangayBusinesses(string $barangay, ?array $rows = null): array
     {
         $key = static::normalizePlace($barangay);
 
-        $pins = [];
-
-        foreach ($this->geocodedRows() as $row) {
-            if (static::normalizePlace($row['juridical']['barangay'] ?? null) !== $key) {
-                continue;
-            }
-
-            $pins[] = $this->pinRow($row);
-        }
-
-        return $pins;
+        return array_values(array_filter(
+            $this->locatedPins($rows),
+            fn (array $pin): bool => static::normalizePlace($pin['barangay'] ?? null) === $key,
+        ));
     }
 
-    /** Geocoded businesses in one canonical sector. */
-    public function sectorBusinesses(string $sector): array
+    /** Exact set-location pins in one canonical sector. */
+    public function sectorBusinesses(string $sector, ?array $rows = null): array
     {
-        $pins = [];
-
-        foreach ($this->geocodedRows() as $row) {
-            if ($this->categorizeIndustry($row['juridical']['line_of_industry'] ?? null) !== $sector) {
-                continue;
-            }
-
-            $pins[] = $this->pinRow($row);
-        }
-
-        return $pins;
+        return array_values(array_filter(
+            $this->locatedPins($rows),
+            fn (array $pin): bool => ($pin['sector'] ?? null) === $sector,
+        ));
     }
 
     // ── Search + summary ────────────────────────────────────────
 
     /** Barangay + street matches, max 30. Barangays resolve to averaged coords. */
-    public function searchArea(string $query): array
+    public function searchArea(string $query, ?array $rows = null): array
     {
         $query = trim($query);
 
@@ -612,7 +864,7 @@ class EconomicMapService
         }
 
         $key = static::normalizePlace($query);
-        $groups = $this->groupByBarangay();
+        $groups = $this->groupByBarangay($rows);
         $matches = [];
 
         foreach ($groups as $group) {
@@ -630,7 +882,7 @@ class EconomicMapService
 
         $seen = [];
 
-        foreach ($this->businessRows() as $row) {
+        foreach ($this->businessRows($rows) as $row) {
             if (count($matches) >= 30) {
                 break;
             }
@@ -669,12 +921,12 @@ class EconomicMapService
         return array_slice($matches, 0, 30);
     }
 
-    public function areaSummary(string $barangay, ?string $street = null): array
+    public function areaSummary(string $barangay, ?string $street = null, ?array $rows = null): array
     {
         $key = static::normalizePlace($barangay);
         $matched = [];
 
-        foreach ($this->businessRows() as $row) {
+        foreach ($this->businessRows($rows) as $row) {
             if (static::normalizePlace($row['juridical']['barangay'] ?? null) !== $key) {
                 continue;
             }
@@ -806,7 +1058,7 @@ class EconomicMapService
 
                     return $map;
                 }
-            } catch (\Throwable) {
+            } catch (Throwable) {
                 // Fall through — return empty map; scoring skips population factor.
             }
 
@@ -1045,7 +1297,7 @@ class EconomicMapService
                     return ['barangays' => $names];
                 }
             }
-        } catch (\Throwable) {
+        } catch (Throwable) {
             // Fall through to the dataset-derived list below.
         }
 
@@ -1083,18 +1335,66 @@ class EconomicMapService
         return $group !== null ? [$group['lat'], $group['lng']] : null;
     }
 
-    /** Barangay-centre bounds for fitting the map viewport. */
-    public function bounds(): ?array
+    /**
+     * Center point for one barangay. Configured centroids take precedence so
+     * a stray saved pin cannot drag the picker's search focus away from the
+     * barangay; snapshot averages and the city centre are fallbacks.
+     *
+     * @return array{0: float, 1: float}
+     */
+    public function barangayCenter(?string $barangay): array
     {
-        $groups = $this->groupByBarangay();
+        $key = static::normalizePlace($barangay);
+        $centroids = config('economic-map.barangay_centroids', []);
+        $fallback = config('economic-map.city_center', [10.4849, 123.4199]);
+
+        // Prefer the surveyed/config centroid over the snapshot average. A
+        // single out-of-town pin must not drag the picker's search focus away
+        // from the barangay.
+        return $centroids[$key] ?? $this->barangayFocus($barangay) ?? $fallback;
+    }
+
+    /** Barangay-centre bounds for fitting the map viewport. */
+    public function bounds(?array $rows = null): ?array
+    {
+        $groups = $this->groupByBarangay($rows);
 
         if ($groups === []) {
             return null;
         }
 
-        $lats = array_map(fn (array $group): float => (float) $group['lat'], $groups);
-        $lngs = array_map(fn (array $group): float => (float) $group['lng'], $groups);
+        return $this->makeBounds(
+            array_map(fn (array $group): float => (float) $group['lat'], $groups),
+            array_map(fn (array $group): float => (float) $group['lng'], $groups),
+        );
+    }
 
+    /**
+     * Bounds for the exact set-location pins, so fitBounds includes every
+     * pin instead of only barangay averages. Falls back to aggregate bounds
+     * when no business has usable coordinates yet.
+     */
+    public function pinBounds(?array $rows = null): ?array
+    {
+        $pins = $this->locatedPins($rows);
+
+        if ($pins === []) {
+            return $this->bounds($rows);
+        }
+
+        return $this->makeBounds(
+            array_map(fn (array $pin): float => (float) $pin['lat'], $pins),
+            array_map(fn (array $pin): float => (float) $pin['lng'], $pins),
+        );
+    }
+
+    /**
+     * @param  array<int, float>  $lats
+     * @param  array<int, float>  $lngs
+     * @return array{0: float, 1: float, 2: float, 3: float}
+     */
+    protected function makeBounds(array $lats, array $lngs): array
+    {
         [$minLat, $maxLat] = [min($lats), max($lats)];
         [$minLng, $maxLng] = [min($lngs), max($lngs)];
 

@@ -2,8 +2,11 @@
     <link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}">
     @include('filament.pages.economic-map.partials.controls')
 
-    <div class="mb-4 max-w-xl">
-        @include('filament.pages.economic-map.partials.search-bar')
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="w-full max-w-xl">
+            @include('filament.pages.economic-map.partials.search-bar')
+        </div>
+        @include('filament.pages.economic-map.partials.unset-pill')
     </div>
 
     @include('filament.pages.economic-map.partials.map-tabs', ['active' => 'opportunity'])
@@ -105,9 +108,9 @@
                         </div>
                     @endif
 
-                    @if (count($pins) > 0)
+                    @if ($summary)
                         <button type="button" wire:click="clearSelection" class="mt-2 rounded-lg px-3 py-1.5 text-xs ring-1 ring-gray-300 hover:bg-gray-50 dark:ring-white/10">
-                            ✕ Clear locations
+                            ✕ Clear selection
                         </button>
                     @endif
                 </div>
@@ -151,20 +154,30 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Opportunity scores blend commercial density, new-registration growth, sector diversity, agriculture share, and livelihood gap — all relative to other barangays. Business counts come from the SCIMS registry; barangays without GPS coordinates are plotted at their approximate centre. Population is sourced from the Philippine Standard Geographic Code API.',
+        'slot' => 'Opportunity scores blend commercial density, new-registration growth, sector diversity, agriculture share, and livelihood gap — all relative to other barangays. Business counts come from the SCIMS registry. Every located business is pinned from its exact saved coordinates; pins sharing the same coordinate are fanned out for visibility, and popups show the exact coordinates. Barangay circles are plotted at their average centre. Population is sourced from the Philippine Standard Geographic Code API.',
     ])
 
     <script type="module">
         import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
 
         const circles  = @js($ranked);
+        const allPins  = @js($mapPins);
         const bounds   = @js($bounds);
         const maxCount = Math.max(...circles.map((c) => c.count), 1);
         const basemap  = @js(config('economic-map.basemap'));
         const el       = document.getElementById('opportunity-map');
 
+        @include('filament.pages.economic-map.partials.pin-layer')
+
         const norm = (e) => e?.detail?.[0] ?? e?.detail ?? {};
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+        }[char]));
+
+        @include('filament.pages.economic-map.partials.pin-popup')
+
         let map = null;
+        let pinPopup = null;
 
         const radius = (count) => 6 + 10 * Math.sqrt(count / maxCount);
 
@@ -185,14 +198,21 @@
         function pinFeatures(pins) {
             return (pins ?? []).map((p) => ({
                 type: 'Feature',
-                properties: { name: p.name, street: p.street, industry: p.industry },
+                properties: {
+                    name: p.name, entity_no: p.entity_no, street: p.street,
+                    barangay: p.barangay, industry: p.industry, sector: p.sector,
+                    color: p.color, lat: p.lat, lng: p.lng,
+                    offset: Array.isArray(p.offset) ? p.offset : [0, 0],
+                },
+                // Exact stored coordinate — never the barangay average.
+                // The offset only moves the rendered icon, not this geometry.
                 geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
             }));
         }
 
         function renderPins(pins) {
             if (! map) return;
-            map.getSource('pins')?.setData({ type: 'FeatureCollection', features: pinFeatures(pins) });
+            emapRenderPins(map, pinFeatures(pins));
         }
 
         function boot() {
@@ -268,27 +288,17 @@
                     },
                 });
 
-                // Individual business pins (loaded on barangay select)
-                map.addSource('pins', {
-                    type: 'geojson',
-                    data: { type: 'FeatureCollection', features: [] },
-                });
-                map.addLayer({
-                    id: 'pins',
-                    type: 'circle',
-                    source: 'pins',
-                    paint: {
-                        'circle-radius':       5,
-                        'circle-color':        '#1d4ed8',
-                        'circle-stroke-width': 2,
-                        'circle-stroke-color': '#ffffff',
-                    },
-                });
+                // Every exact set-location pin, visible on load.
+                emapAddPinLayer(map, pinFeatures(allPins));
 
                 // Popup on circle click
                 const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false });
 
                 map.on('click', 'circles', (e) => {
+                    // Pins sit on top of the aggregate circles; prefer the
+                    // exact business pin when both are under the cursor.
+                    if (map.queryRenderedFeatures(e.point, { layers: ['pins'] }).length > 0) return;
+
                     const props = e.features?.[0]?.properties;
                     if (! props) return;
 
@@ -313,6 +323,17 @@
                     popup.remove();
                 });
 
+                map.on('click', 'pins', (e) => {
+                    const p = e.features?.[0]?.properties;
+                    if (! p) return;
+
+                    if (! pinPopup) pinPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px' });
+
+                    pinPopup.setLngLat([Number(p.lng), Number(p.lat)]).setHTML(emapPinPopupHtml(p, true)).addTo(map);
+                });
+                map.on('mouseenter', 'pins', () => (map.getCanvas().style.cursor = 'pointer'));
+                map.on('mouseleave', 'pins', () => (map.getCanvas().style.cursor = ''));
+
                 if (bounds) {
                     map.fitBounds(
                         [[bounds[1], bounds[0]], [bounds[3], bounds[2]]],
@@ -326,16 +347,14 @@
             const d = norm(e);
             const found = circles.find((c) => c.barangay === d.barangay);
             if (map && found) map.flyTo({ center: [found.lng, found.lat], zoom: 14 });
-            renderPins(d.pins);
         });
 
         window.addEventListener('emap-focus-street', (e) => {
             const d = norm(e);
             if (map && d.lat && d.lng) map.flyTo({ center: [d.lng, d.lat], zoom: 16 });
-            renderPins(d.pins);
         });
 
-        window.addEventListener('emap-clear-pins',      () => renderPins([]));
+        window.addEventListener('emap-clear-pins',      () => renderPins(allPins));
         window.addEventListener('emap-data-refreshed',  () => window.location.reload());
 
         document.addEventListener('livewire:navigated', () => boot());

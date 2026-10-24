@@ -11,3 +11,7 @@ Artisan::command('inspire', function () {
 Schedule::command('economic-map:sync')
     ->everySixHours()
     ->withoutOverlapping(30);
+
+Schedule::command('economic-map:sync-streets')
+    ->monthlyOn(1, '02:30')
+    ->withoutOverlapping(60);

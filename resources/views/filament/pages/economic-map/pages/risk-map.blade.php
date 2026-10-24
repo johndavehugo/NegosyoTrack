@@ -9,8 +9,11 @@
             ->implode(', ').')';
     @endphp
 
-    <div class="mb-4 max-w-xl">
-        @include('filament.pages.economic-map.partials.search-bar')
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="w-full max-w-xl">
+            @include('filament.pages.economic-map.partials.search-bar')
+        </div>
+        @include('filament.pages.economic-map.partials.unset-pill')
     </div>
 
     @include('filament.pages.economic-map.partials.map-tabs', ['active' => 'risk'])
@@ -51,12 +54,16 @@
                         wire:model.live="selectedCalamity"
                         class="emap-select mt-1 w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-3 text-sm font-medium shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-gray-900 dark:focus:ring-blue-500/20"
                     >
-                        <option value="">All events</option>
+                        <option value="" @selected(blank($selectedCalamity))>All events</option>
                         @foreach ($calamities as $calamity)
-                            <option value="{{ $calamity['id'] }}">{{ $calamity['name'] }}</option>
+                            <option
+                                value="{{ $calamity['id'] }}"
+                                @selected((string) $selectedCalamity === (string) $calamity['id'])
+                            >{{ $calamity['name'] }}</option>
                         @endforeach
                     </select>
                     <p class="mt-1 text-xs text-gray-400">Risk is recomputed using the historical damage of the selected event (from Calamity Monitoring).</p>
+                    <p wire:loading wire:target="selectedCalamity" class="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">Refreshing risk data…</p>
                     @if ($this->selectedCalamityName())
                         <p class="mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">Showing: {{ $this->selectedCalamityName() }}</p>
                     @endif
@@ -76,9 +83,10 @@
                     <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Reading the map</p>
                     <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
                         <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat blur</span> — risk intensity: blue is least risk-prone, red is most risk-prone</li>
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Marker dot</span> — the barangay's exact risk band, from exposure × historical damage</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Barangay dot</span> — the barangay's exact risk band, from exposure × historical damage</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Blue pin</span> — an individual business; pins sharing the same saved coordinate are fanned out for visibility</li>
                     </ul>
-                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Click a dot for the full exposure and damage breakdown behind its score.</p>
+                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Click a barangay dot for its risk breakdown, or a blue pin for the business's exact location.</p>
                 </div>
 
                 @include('filament.pages.economic-map.partials.summary-card')
@@ -115,21 +123,37 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Heat blur shows risk intensity — red areas are risk-prone, blue areas are least risk-prone. Dot colour is the exact risk band; click a dot for the full breakdown.',
+        'slot' => 'Heat blur shows risk intensity — red areas are risk-prone, blue areas are least risk-prone. Barangay dot colour is the exact risk band. Blue pins mark every business with a set location from its exact saved coordinates, independent of the heat layer; pins sharing the same coordinate are fanned out and popups show the exact coordinates.',
     ])
 
     <script type="module">
         import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
 
-        const barangays = @js($barangays);
-        const bounds = @js($bounds);
+        let barangays = @js($barangays);
+        let allPins = @js($mapPins);
+        let bounds = @js($bounds);
         const basemap = @js(config('economic-map.basemap'));
         const heatRamp = @js(config('economic-map.heat_ramp'));
         const el = document.getElementById('risk-map');
 
+        @include('filament.pages.economic-map.partials.pin-layer')
+
         const norm = (e) => e?.detail?.[0] ?? e?.detail ?? {};
+        const asList = (value) => {
+            if (Array.isArray(value)) return value;
+            if (value && typeof value === 'object') return Object.values(value);
+
+            return null;
+        };
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+        }[char]));
+
+        @include('filament.pages.economic-map.partials.pin-popup')
+
         let map = null;
         let popup = null;
+        let pinPopup = null;
 
         const money = (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
@@ -158,6 +182,19 @@
                 geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
             })),
         });
+
+        const pinFeatures = () => (allPins ?? []).map((p) => ({
+            type: 'Feature',
+            properties: {
+                name: p.name, entity_no: p.entity_no, street: p.street,
+                barangay: p.barangay, industry: p.industry, sector: p.sector,
+                color: p.color, lat: p.lat, lng: p.lng,
+                offset: Array.isArray(p.offset) ? p.offset : [0, 0],
+            },
+            // Exact stored coordinate — never the barangay average.
+            // The offset only moves the rendered icon, not this geometry.
+            geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+        }));
 
         const heatColor = ['interpolate', ['linear'], ['heatmap-density']];
         for (const stop of [...heatRamp].sort((a, b) => a.stop - b.stop)) heatColor.push(stop.stop, stop.color);
@@ -208,7 +245,7 @@
                 map.addLayer({
                     id: 'centers', type: 'circle', source: 'centers',
                     paint: {
-                        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 4, 14, 6.5],
+                        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 5.5, 14, 8.5],
                         'circle-color': ['get', 'color'],
                         'circle-opacity': 0.95,
                         'circle-stroke-width': 1.5,
@@ -216,7 +253,14 @@
                     },
                 });
 
+                // Every exact set-location pin, visible on load above the
+                // aggregate barangay dots.
+                emapAddPinLayer(map, pinFeatures());
+
                 map.on('click', 'centers', (e) => {
+                    // Prefer the exact business pin when it overlaps a dot.
+                    if (map.queryRenderedFeatures(e.point, { layers: ['pins'] }).length > 0) return;
+
                     const p = e.features?.[0]?.properties;
                     if (! p) return;
 
@@ -239,6 +283,17 @@
                 map.on('mouseenter', 'centers', () => (map.getCanvas().style.cursor = 'pointer'));
                 map.on('mouseleave', 'centers', () => (map.getCanvas().style.cursor = ''));
 
+                map.on('click', 'pins', (e) => {
+                    const p = e.features?.[0]?.properties;
+                    if (! p) return;
+
+                    if (! pinPopup) pinPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px' });
+
+                    pinPopup.setLngLat([Number(p.lng), Number(p.lat)]).setHTML(emapPinPopupHtml(p, true)).addTo(map);
+                });
+                map.on('mouseenter', 'pins', () => (map.getCanvas().style.cursor = 'pointer'));
+                map.on('mouseleave', 'pins', () => (map.getCanvas().style.cursor = ''));
+
                 if (bounds) map.fitBounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]], { padding: 40 });
             });
         }
@@ -254,7 +309,31 @@
             if (map && d.lat && d.lng) map.flyTo({ center: [d.lng, d.lat], zoom: 16 });
         });
 
-        window.addEventListener('emap-data-refreshed', () => window.location.reload());
+        window.addEventListener('emap-risk-updated', (e) => {
+            const d = norm(e);
+            const nextBarangays = asList(d.barangays);
+            const nextPins = asList(d.pins);
+            const nextBounds = asList(d.bounds);
+
+            if (nextBarangays) barangays = nextBarangays;
+            if (nextBounds?.length === 4) bounds = nextBounds;
+
+            if (! map) return;
+
+            // Refresh the risk layers and pins in place. Reloading the page
+            // would reset the Calamity Event select to "All events".
+            map.getSource('heat')?.setData(heatFeatures());
+            map.getSource('centers')?.setData(centerFeatures());
+
+            if (nextPins) {
+                allPins = nextPins;
+
+                if (map.getSource('pins')) emapRenderPins(map, pinFeatures());
+            }
+
+            popup?.remove();
+            pinPopup?.remove();
+        });
         document.addEventListener('livewire:navigated', () => boot());
 
         let resizeTimer;

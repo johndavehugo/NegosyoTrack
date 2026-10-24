@@ -49,20 +49,33 @@ class DistributionMap extends BaseMapPage
     protected function loadData(): void
     {
         $service = app(EconomicMapService::class);
-        $distribution = $service->distribution();
+        $located = $service->locatedBusinessRows();
+        $distribution = $service->distribution($located);
 
         $this->sectors = $distribution['sectors'];
         $this->barangays = $distribution['barangays'];
         $this->total = $distribution['total'];
-        $this->bounds = $service->bounds();
+        $this->bounds = $service->pinBounds($located);
         $this->hasData = $this->total > 0;
+        $this->loadMapPins($service);
+        $this->loadUnsetCount();
+    }
+
+    /** Distribution only plots businesses with a set location. */
+    protected function onlyLocated(): bool
+    {
+        return true;
     }
 
     public function selectSector(string $sector): void
     {
         $this->activeSector = $sector;
         $this->sectorFilter = $sector;
-        $this->sectorPins = app(EconomicMapService::class)->sectorBusinesses($sector);
+
+        $service = app(EconomicMapService::class);
+        $this->sectorPins = $service->displayPins(
+            $service->sectorBusinesses($sector, $service->locatedBusinessRows()),
+        );
 
         $this->dispatch('emap-sector-pins', [
             'sector' => $sector,

@@ -47,6 +47,42 @@ return [
     // Fallback when a SCIMS barangay has no configured centre.
     'city_center' => [10.4849, 123.4199],
 
+    // Generous San Carlos City bounding box. The Business Locations picker
+    // uses this to keep geocoding local and to reject pins accidentally
+    // dropped in another province.
+    'city_bounds' => [
+        'min_lat' => 10.25,
+        'max_lat' => 10.70,
+        'min_lng' => 123.10,
+        'max_lng' => 123.55,
+    ],
+
+    // Display-only fan-out for pins that share the same saved coordinate.
+    // Offsets are in screen pixels and never change the stored lat/lng.
+    'overlap_pin_radius_px' => 12,
+    'overlap_pin_max_radius_px' => 24,
+
+    // Local place aliases that OSM indexes under a different or simpler name.
+    // Values are subdivision centroids with the label shown in the picker;
+    // the marker is placed there so the user can drag it to the exact building.
+    'local_places' => [
+        'Greenville' => [
+            'label' => 'Greenville, Barangay Rizal',
+            'lat' => 10.4881589,
+            'lng' => 123.3986898,
+        ],
+        'St. Vincent' => [
+            'label' => 'St. Vincent, Barangay I',
+            'lat' => 10.4924079,
+            'lng' => 123.4248450,
+        ],
+        'Saint Vincent' => [
+            'label' => 'St. Vincent, Barangay I',
+            'lat' => 10.4924079,
+            'lng' => 123.4248450,
+        ],
+    ],
+
     // OSM raster basemap for MapLibre (no key required).
     'basemap' => [
         'tiles' => [

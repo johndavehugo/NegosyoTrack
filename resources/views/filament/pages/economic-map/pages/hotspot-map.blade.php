@@ -2,26 +2,38 @@
     <link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}">
     @include('filament.pages.economic-map.partials.controls')
 
-    <div class="mb-4 max-w-xl">
-        @include('filament.pages.economic-map.partials.search-bar')
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div class="w-full max-w-xl">
+            @include('filament.pages.economic-map.partials.search-bar')
+        </div>
+        @include('filament.pages.economic-map.partials.unset-pill')
     </div>
 
     @include('filament.pages.economic-map.partials.map-tabs', ['active' => 'hotspot'])
 
     @if (! $hasData)
         <div class="rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-900">
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">No business data yet</p>
-            <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-                The SCIMS registry snapshot is empty. Run
-                <span class="font-mono">php artisan economic-map:sync</span> or wait for the scheduled sync, then refresh this page.
-            </p>
+            @if ($unsetCount > 0)
+                <p class="text-lg font-semibold text-gray-900 dark:text-white">No business locations set yet</p>
+                <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                    This map only plots businesses with a location. Set coordinates on the
+                    <a href="{{ \App\Filament\Pages\EconomicMap\BusinessLocations::getUrl() }}" class="font-medium text-blue-600 hover:underline">Business Locations</a>
+                    page and they will appear here.
+                </p>
+            @else
+                <p class="text-lg font-semibold text-gray-900 dark:text-white">No business data yet</p>
+                <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+                    The SCIMS registry snapshot is empty. Run
+                    <span class="font-mono">php artisan economic-map:sync</span> or wait for the scheduled sync, then refresh this page.
+                </p>
+            @endif
         </div>
     @else
         <div class="grid grid-cols-12 gap-4">
             {{-- Left sidebar --}}
             <div class="col-span-12 space-y-4 md:col-span-4 lg:col-span-3">
                 @include('filament.pages.economic-map.partials.stat-card', [
-                    'label' => 'Registered MSMEs',
+                    'label' => 'MSMEs with Locations',
                     'value' => number_format($total),
                     'color' => '#2563eb',
                 ])
@@ -34,7 +46,7 @@
                 ])
 
                 @include('filament.pages.economic-map.partials.stat-card', [
-                    'label' => 'Barangays with Businesses',
+                    'label' => 'Barangays with Locations',
                     'value' => number_format($barangayCount),
                     'color' => '#16a34a',
                 ])
@@ -78,16 +90,16 @@
                 <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Individual MSME Locations</h3>
-                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-white/10">{{ count($pins) > 0 ? count($pins) : 'None' }}</span>
+                        <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500 dark:bg-white/10">{{ count($mapPins) > 0 ? count($mapPins) : 'None' }}</span>
                     </div>
                     @if ($summary && count($pins) > 0)
-                        <p class="mt-2 text-xs text-gray-500">{{ $summary['barangay'] }} · {{ number_format(count($pins)) }} registered MSMEs shown · SCIMS registry</p>
+                        <p class="mt-2 text-xs text-gray-500">{{ $summary['barangay'] }} · {{ number_format(count($pins)) }} located MSMEs in this area · SCIMS registry</p>
                     @else
-                        <p class="mt-2 text-xs text-gray-500">Select a hotspot or barangay ranking to load its registered MSMEs.</p>
+                        <p class="mt-2 text-xs text-gray-500">All located MSMEs are pinned; exact coordinates appear in each popup.</p>
                     @endif
-                    <p class="mt-1 text-xs text-gray-400">Pins require real GPS coordinates from SCIMS. Barangay totals include every registered business.</p>
-                    @if (count($pins) > 0)
-                        <button type="button" wire:click="clearSelection" class="mt-2 rounded-lg px-3 py-1.5 text-xs ring-1 ring-gray-300 hover:bg-gray-50 dark:ring-white/10">✕ Clear locations</button>
+                    <p class="mt-1 text-xs text-gray-400">Each pin comes from the coordinates set on the Business Locations page. Pins sharing the same coordinate are fanned out slightly; barangay totals include only located businesses.</p>
+                    @if ($summary)
+                        <button type="button" wire:click="clearSelection" class="mt-2 rounded-lg px-3 py-1.5 text-xs ring-1 ring-gray-300 hover:bg-gray-50 dark:ring-white/10">✕ Clear selection</button>
                     @endif
                 </div>
 
@@ -98,7 +110,7 @@
                 <div class="overflow-hidden rounded-lg shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
                     <div class="flex h-10 shrink-0 items-center gap-2 bg-[#1e2a78] px-4">
                         <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🔥 Economic Hotspot Map — Business Concentration per Barangay</p>
-                        <span class="shrink-0 rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-[#1e2a78]">{{ number_format($total) }} Registered MSMEs</span>
+                        <span class="shrink-0 rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-[#1e2a78]">{{ number_format($total) }} Located MSMEs</span>
                     </div>
                     <div class="relative md:min-h-0 md:flex-1">
                         <div id="hotspot-map" wire:ignore class="h-[60vh] w-full md:h-full"></div>
@@ -122,20 +134,32 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Hotspots reflect the number of registered MSMEs per barangay from the SCIMS registry. Barangays without GPS coordinates are plotted at their approximate centre. Larger, darker circles indicate higher business concentration. Select a hotspot circle or barangay ranking to view individual business details.',
+        'slot' => 'Hotspots reflect only businesses with a set location. Every located business is pinned from its exact saved coordinates; pins sharing the same coordinate are fanned out for visibility, and popups show the exact coordinates. The larger barangay circles are concentration summaries plotted at their average centre. Select a hotspot circle or barangay ranking to fly to that area.',
     ])
 
     <script type="module">
         import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
 
         const circles = @js($ranked);
+        const allPins = @js($mapPins);
         const bounds = @js($bounds);
         const maxCount = @js($top['count'] ?? 1);
         const basemap = @js(config('economic-map.basemap'));
         const el = document.getElementById('hotspot-map');
 
+        @include('filament.pages.economic-map.partials.pin-layer')
+
         const norm = (e) => e?.detail?.[0] ?? e?.detail ?? {};
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+        }[char]));
+
+        @include('filament.pages.economic-map.partials.pin-popup')
+
         let map = null;
+        let pinPopup = null;
+        let hoverPopup = null;
+        let hoveredPinKey = null;
 
         const radius = (count) => 6 + 8 * Math.sqrt(count / Math.max(maxCount, 1));
 
@@ -150,14 +174,55 @@
         function pinFeatures(pins) {
             return (pins ?? []).map((p) => ({
                 type: 'Feature',
-                properties: { name: p.name, street: p.street, industry: p.industry },
+                properties: {
+                    name: p.name, entity_no: p.entity_no, street: p.street,
+                    barangay: p.barangay, industry: p.industry, sector: p.sector,
+                    color: p.color, lat: p.lat, lng: p.lng,
+                    offset: Array.isArray(p.offset) ? p.offset : [0, 0],
+                },
+                // Exact stored coordinate — never the barangay average.
+                // The offset only moves the rendered icon, not this geometry.
                 geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
             }));
         }
 
+        const pinPoint = (p) => {
+            const point = map.project([Number(p.lng), Number(p.lat)]);
+            const offset = Array.isArray(p.offset) ? p.offset : [0, 0];
+
+            return map.unproject([
+                point.x + Number(offset[0] ?? 0),
+                point.y + Number(offset[1] ?? 0),
+            ]);
+        };
+
+        const hidePinTooltip = () => {
+            hoveredPinKey = null;
+            hoverPopup?.remove();
+        };
+
+        const showPinTooltip = (p) => {
+            if (! map) return;
+
+            if (! hoverPopup) {
+                hoverPopup = new maplibregl.Popup({
+                    closeButton: false,
+                    closeOnClick: false,
+                    focusAfterOpen: false,
+                    anchor: 'bottom',
+                    offset: [0, -18],
+                    maxWidth: '320px',
+                    className: 'emap-pin-tooltip',
+                });
+            }
+
+            hoverPopup.setLngLat(pinPoint(p)).setHTML(emapPinPopupHtml(p)).addTo(map);
+        };
+
         function renderPins(pins) {
             if (! map) return;
-            map.getSource('pins')?.setData({ type: 'FeatureCollection', features: pinFeatures(pins) });
+            hidePinTooltip();
+            emapRenderPins(map, pinFeatures(pins));
         }
 
         function boot() {
@@ -199,15 +264,59 @@
                     },
                 });
 
-                map.addSource('pins', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-                map.addLayer({ id: 'pins', type: 'circle', source: 'pins', paint: { 'circle-radius': 5, 'circle-color': '#1d4ed8', 'circle-stroke-width': 2, 'circle-stroke-color': '#ffffff' } });
+                emapAddPinLayer(map, pinFeatures(allPins));
 
                 map.on('click', 'circles', (e) => {
+                    // Pins sit on top of the aggregate circles; prefer the
+                    // exact business pin when both are under the cursor.
+                    if (map.queryRenderedFeatures(e.point, { layers: ['pins'] }).length > 0) return;
+
                     const name = e.features?.[0]?.properties?.barangay;
                     if (name && window.Livewire) window.Livewire.dispatch('emap-select-barangay', { barangay: name });
                 });
                 map.on('mouseenter', 'circles', () => (map.getCanvas().style.cursor = 'pointer'));
                 map.on('mouseleave', 'circles', () => (map.getCanvas().style.cursor = ''));
+
+                map.on('click', 'pins', (e) => {
+                    const p = e.features?.[0]?.properties;
+                    if (! p) return;
+
+                    hidePinTooltip();
+
+                    if (! pinPopup) pinPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px' });
+
+                    pinPopup.setLngLat([Number(p.lng), Number(p.lat)]).setHTML(emapPinPopupHtml(p, true)).addTo(map);
+                });
+
+                map.on('mouseenter', 'pins', (e) => {
+                    map.getCanvas().style.cursor = 'pointer';
+
+                    const p = e.features?.[0]?.properties;
+                    if (! p) return;
+
+                    hoveredPinKey = `${p.entity_no || ''}|${p.lat},${p.lng}`;
+                    showPinTooltip(p);
+                });
+
+                map.on('mousemove', 'pins', (e) => {
+                    const p = e.features?.[0]?.properties;
+                    if (! p) return;
+
+                    const key = `${p.entity_no || ''}|${p.lat},${p.lng}`;
+                    if (hoveredPinKey === key) return;
+
+                    hoveredPinKey = key;
+                    showPinTooltip(p);
+                });
+
+                map.on('mouseleave', 'pins', () => {
+                    map.getCanvas().style.cursor = '';
+                    hidePinTooltip();
+                });
+
+                map.on('click', hidePinTooltip);
+                map.on('movestart', hidePinTooltip);
+                map.on('zoomstart', hidePinTooltip);
 
                 if (bounds) map.fitBounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]], { padding: 40 });
             });
@@ -217,16 +326,14 @@
             const d = norm(e);
             const found = circles.find((c) => c.barangay === d.barangay);
             if (map && found) map.flyTo({ center: [found.lng, found.lat], zoom: 14 });
-            renderPins(d.pins);
         });
 
         window.addEventListener('emap-focus-street', (e) => {
             const d = norm(e);
             if (map && d.lat && d.lng) map.flyTo({ center: [d.lng, d.lat], zoom: 16 });
-            renderPins(d.pins);
         });
 
-        window.addEventListener('emap-clear-pins', () => renderPins([]));
+        window.addEventListener('emap-clear-pins', () => renderPins(allPins));
         window.addEventListener('emap-data-refreshed', () => window.location.reload());
         document.addEventListener('livewire:navigated', () => boot());
 

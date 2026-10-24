@@ -27,7 +27,12 @@ abstract class BaseMapPage extends Page
 
     public array $pins = [];
 
+    /** Every exact set-location pin rendered on page load. */
+    public array $mapPins = [];
+
     public string $selectedBarangay = '';
+
+    public int $unsetCount = 0;
 
     public static function getNavigationGroup(): ?string
     {
@@ -58,7 +63,9 @@ abstract class BaseMapPage extends Page
 
     public function updatedSearchQuery(): void
     {
-        $this->searchResults = app(EconomicMapService::class)->searchArea($this->searchQuery);
+        $service = app(EconomicMapService::class);
+
+        $this->searchResults = $service->searchArea($this->searchQuery, $this->mapRows($service));
     }
 
     public function clearSearch(): void
@@ -75,9 +82,10 @@ abstract class BaseMapPage extends Page
         }
 
         $service = app(EconomicMapService::class);
+        $rows = $this->mapRows($service);
 
-        $this->summary = $service->areaSummary($barangay);
-        $this->pins = $service->barangayBusinesses($barangay);
+        $this->summary = $service->areaSummary($barangay, null, $rows);
+        $this->pins = $service->barangayBusinesses($barangay, $rows);
         $this->clearSearch();
 
         $this->dispatch('emap-focus', [
@@ -101,9 +109,10 @@ abstract class BaseMapPage extends Page
         }
 
         $service = app(EconomicMapService::class);
+        $rows = $this->mapRows($service);
 
-        $this->summary = $service->areaSummary($match['barangay'], $match['street']);
-        $this->pins = $service->barangayBusinesses($match['barangay']);
+        $this->summary = $service->areaSummary($match['barangay'], $match['street'], $rows);
+        $this->pins = $service->barangayBusinesses($match['barangay'], $rows);
         $this->clearSearch();
 
         $this->dispatch('emap-focus-street', [
@@ -135,6 +144,43 @@ abstract class BaseMapPage extends Page
     public function selectBarangayFromMap(string $barangay): void
     {
         $this->selectBarangay($barangay);
+    }
+
+    /**
+     * Rows this page should operate on. Map pages that show only located
+     * businesses override onlyLocated(); every other page keeps all rows.
+     *
+     * @return array<int, array>|null
+     */
+    protected function mapRows(EconomicMapService $service): ?array
+    {
+        return $this->onlyLocated() ? $service->locatedBusinessRows() : null;
+    }
+
+    /** Whether this page only considers businesses with a set location. */
+    protected function onlyLocated(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Load the exact set-location pins every map view renders on load.
+     * Coincident pins receive display-only offsets so none are hidden.
+     */
+    protected function loadMapPins(EconomicMapService $service): void
+    {
+        $this->mapPins = $service->displayPins($service->locatedPins());
+    }
+
+    /**
+     * Number of SCIMS businesses whose entity number has no `locations` row.
+     *
+     * Only map pages that render the unset pill call this; the Business
+     * Locations table re-renders on pagination and does not pay for the scan.
+     */
+    protected function loadUnsetCount(): void
+    {
+        $this->unsetCount = app(EconomicMapService::class)->unsetCount();
     }
 
     abstract protected function loadData(): void;
