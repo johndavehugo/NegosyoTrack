@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use App\Models\PriceMonitoring\CommodityVariant;
 use App\Observers\PriceMonitoring\CommodityVariantObserver;
-use App\Services\ScimsJuridicalApiService;
 use Filament\Support\Facades\FilamentColor;
 use Illuminate\Support\ServiceProvider;
 
@@ -15,7 +14,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->singleton(ScimsJuridicalApiService::class);
+        //
     }
 
     /**

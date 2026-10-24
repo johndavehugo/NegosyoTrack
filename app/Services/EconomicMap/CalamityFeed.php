@@ -31,39 +31,50 @@ class CalamityFeed
     /**
      * Damage + affected counts keyed by raw barangay name.
      *
-     * Barangay is snapshotted onto each incident from SCIMS when it is
-     * created, so this reads `calamity_incidents` only — no joins to the
-     * retired local MSME tables.
+     * The barangay is snapshotted onto each incident from SCIMS when it
+     * is created, so `calamity_incidents` is read directly — no joins to
+     * the retired local MSME tables. Incidents that predate the snapshot
+     * fall back to the supplied entity_no => barangay map, then to
+     * "Unspecified".
      *
+     * @param  array<string, string>  $entityBarangays  entity_no => barangay
      * @return array{by_barangay: array<string, array{damage: float, affected: int, incidents: int}>, total_damage: float, total_affected: int}
      */
-    public function damageByBarangay(?int $calamityId = null): array
+    public function damageByBarangay(?int $calamityId = null, array $entityBarangays = []): array
     {
-        $label = "COALESCE(NULLIF(TRIM(barangay), ''), 'Unspecified')";
-
         $rows = DB::table('calamity_incidents')
             ->where('estimated_cost_of_damages', '>', 0)
             ->when($calamityId > 0, fn ($query) => $query->where('calamity_id', $calamityId))
-            ->selectRaw("{$label} as barangay")
+            ->select('juridical_id')
+            ->selectRaw("COALESCE(NULLIF(TRIM(barangay), ''), '') as barangay")
             ->selectRaw('SUM(estimated_cost_of_damages) as damage')
-            ->selectRaw('COUNT(DISTINCT juridical_id) as affected')
             ->selectRaw('COUNT(*) as incidents')
-            ->groupBy('barangay')
+            ->groupBy('juridical_id', 'barangay')
             ->get();
 
         $damage = [];
+        $affected = [];
+
+        foreach ($rows as $row) {
+            $entityNo = trim((string) $row->juridical_id);
+
+            $barangay = trim((string) $row->barangay)
+                ?: (trim((string) ($entityBarangays[$entityNo] ?? '')) ?: 'Unspecified');
+
+            $damage[$barangay] ??= ['damage' => 0.0, 'affected' => 0, 'incidents' => 0];
+            $damage[$barangay]['damage'] += (float) $row->damage;
+            $damage[$barangay]['incidents'] += (int) $row->incidents;
+
+            $affected[$barangay][$entityNo] = true;
+        }
+
         $totalDamage = 0.0;
         $totalAffected = 0;
 
-        foreach ($rows as $row) {
-            $damage[$row->barangay] = [
-                'damage' => (float) $row->damage,
-                'affected' => (int) $row->affected,
-                'incidents' => (int) $row->incidents,
-            ];
-
-            $totalDamage += (float) $row->damage;
-            $totalAffected += (int) $row->affected;
+        foreach ($damage as $barangay => $entry) {
+            $damage[$barangay]['affected'] = count($affected[$barangay]);
+            $totalDamage += $entry['damage'];
+            $totalAffected += $damage[$barangay]['affected'];
         }
 
         return [
