@@ -12,7 +12,9 @@ class CreateTrainingProgram extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return TrainingProgramResource::getUrl('index');
+        return TrainingProgramResource::getUrl('view', [
+            'record' => $this->getRecord(),
+        ]);
     }
 
     /**

@@ -31,6 +31,11 @@ class ScimsTrainingService
      */
     protected array $individualMemo = [];
 
+    /**
+     * @var array<string, array<string, mixed>|null>
+     */
+    protected array $businessMemo = [];
+
     public function __construct(
         protected ScimsJuridicalApiService $juridical,
     ) {}
@@ -87,29 +92,60 @@ class ScimsTrainingService
      */
     public function businessLabel(string $entityNo): string
     {
-        $cacheKey = 'scims-training:business:'.$entityNo;
+        $business = $this->findBusiness($entityNo);
+
+        return is_array($business)
+            ? $this->businessOptionLabel($business, $entityNo)
+            : $entityNo;
+    }
+
+    /**
+     * Business name for snapshotting onto a training record.
+     */
+    public function businessName(?string $entityNo): ?string
+    {
+        $business = $this->findBusiness($entityNo);
+        $name = trim((string) ($business['juri_name'] ?? ''));
+
+        return $name !== '' ? $name : null;
+    }
+
+    /**
+     * Resolve one business from SCIMS. Null when missing or unreachable.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findBusiness(?string $entityNo): ?array
+    {
+        if (blank($entityNo)) {
+            return null;
+        }
+
+        if (array_key_exists($entityNo, $this->businessMemo)) {
+            return $this->businessMemo[$entityNo];
+        }
+
+        $cacheKey = 'scims-training:business-record:'.$entityNo;
 
         $cached = Cache::get($cacheKey);
 
-        if (is_string($cached)) {
-            return $cached;
+        if (is_array($cached)) {
+            return $this->businessMemo[$entityNo] = $cached;
         }
 
         try {
             $business = $this->juridical->getBusinessByID($entityNo);
         } catch (Throwable) {
-            return $entityNo;
+            return null;
         }
 
         if (! is_array($business)) {
-            return $entityNo;
+            return null;
         }
 
-        $label = $this->businessOptionLabel($business, $entityNo);
+        Cache::put($cacheKey, $business, now()->addMinutes(self::CACHE_TTL_MINUTES));
 
-        Cache::put($cacheKey, $label, now()->addMinutes(self::CACHE_TTL_MINUTES));
-
-        return $label;
+        return $this->businessMemo[$entityNo] = $business;
     }
 
     /**

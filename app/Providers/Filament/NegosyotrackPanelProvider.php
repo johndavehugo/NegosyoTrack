@@ -2,6 +2,7 @@
 
 namespace App\Providers\Filament;
 
+use App\Filament\Pages\Dashboard;
 use Filament\Enums\GlobalSearchPosition;
 use Filament\Enums\UserMenuPosition;
 use Filament\Http\Middleware\Authenticate;
@@ -11,14 +12,14 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Leandrocfe\FilamentApexCharts\FilamentApexChartsPlugin;
-use App\Filament\Pages\Dashboard;
+use Filament\Support\Icons\Heroicon;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Routing\Middleware\SubstituteBindings;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\View\Middleware\ShareErrorsFromSession;
+use Leandrocfe\FilamentApexCharts\FilamentApexChartsPlugin;
 
 class NegosyotrackPanelProvider extends PanelProvider
 {
@@ -45,6 +46,10 @@ class NegosyotrackPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label('Msme Management'),
+
+                NavigationGroup::make()
+                    ->label('Training & Capacity Building')
+                    ->icon(Heroicon::AcademicCap),
 
                 NavigationGroup::make()
                     ->label('Calamity Monitoring'),

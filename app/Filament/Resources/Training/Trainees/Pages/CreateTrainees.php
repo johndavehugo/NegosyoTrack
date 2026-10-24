@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Training\Trainees\Pages;
 
 use App\Filament\Resources\Training\Trainees\TraineesResource;
+use App\Filament\Resources\Training\TrainingPrograms\TrainingProgramResource;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Support\Str;
 
@@ -12,7 +13,11 @@ class CreateTrainees extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        return TraineesResource::getUrl('index');
+        $trainingId = $this->getRecord()->training_id;
+
+        return filled($trainingId)
+            ? TrainingProgramResource::getUrl('view', ['record' => $trainingId])
+            : TraineesResource::getUrl('index');
     }
 
     /**

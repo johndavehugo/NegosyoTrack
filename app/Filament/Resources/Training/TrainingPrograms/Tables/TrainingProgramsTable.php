@@ -2,15 +2,25 @@
 
 namespace App\Filament\Resources\Training\TrainingPrograms\Tables;
 
+use App\Enums\TrainingStatus;
+use App\Filament\Resources\Training\Trainees\TraineesResource;
+use App\Filament\Resources\Training\TrainingPrograms\TrainingProgramResource;
 use App\Models\Training\Training;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
+use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
-use Filament\Support\Colors\Color;
+use Filament\Actions\ViewAction;
+use Filament\Notifications\Notification;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class TrainingProgramsTable
 {
@@ -18,52 +28,47 @@ class TrainingProgramsTable
     {
         return $table
             ->columns([
-                TextColumn::make('entity_no')
-                    ->label('Entity No.')
-                    ->searchable()
-                    ->sortable()
-                    ->copyable()
-                    ->copyMessage('Copied!')
-                    ->badge()
-                    ->color('gray'),
-
                 TextColumn::make('training_program')
                     ->label('Training Program')
                     ->searchable()
                     ->sortable()
-                    ->limit(45)
-                    ->tooltip(fn (Training $record): string => $record->training_program),
+                    ->weight('semibold')
+                    ->wrap()
+                    ->description(fn (Training $record): string => collect([
+                        $record->training_type,
+                        $record->conducted_by,
+                    ])->filter()->join(' · '))
+                    ->limit(70),
 
-                TextColumn::make('training_type')
-                    ->label('Type')
-                    ->searchable()
-                    ->badge()
-                    ->color('info')
-                    ->toggleable(),
+                TextColumn::make('business_name')
+                    ->label('Business')
+                    ->state(fn (Training $record): string => $record->business_display_name)
+                    ->description(fn (Training $record): string => $record->entity_no)
+                    ->searchable(['business_name', 'entity_no'])
+                    ->sortable()
+                    ->limit(35),
 
                 TextColumn::make('from_date')
-                    ->label('From')
-                    ->date('M d, Y')
-                    ->sortable(),
-
-                TextColumn::make('to_date')
-                    ->label('To')
-                    ->date('M d, Y')
+                    ->label('Schedule')
+                    ->state(fn (Training $record): string => $record->schedule_label)
+                    ->description(fn (Training $record): string => $record->hours_no.' training hours')
                     ->sortable()
-                    ->toggleable(),
+                    ->wrap(),
 
-                TextColumn::make('hours_no')
-                    ->label('Hours')
-                    ->suffix(' hrs')
-                    ->sortable()
+                TextColumn::make('trainees_count')
+                    ->label('Trainees')
+                    ->counts('trainees')
+                    ->badge()
+                    ->color('info')
                     ->alignCenter()
-                    ->toggleable(),
+                    ->url(fn (Training $record): string => TrainingProgramResource::getUrl('view', ['record' => $record])),
 
-                TextColumn::make('conducted_by')
-                    ->label('Conducted By')
-                    ->searchable()
-                    ->limit(35)
-                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn (?TrainingStatus $state): string => $state?->getLabel() ?? '—')
+                    ->icon(fn (?TrainingStatus $state) => $state?->getIcon())
+                    ->sortable(),
 
                 TextColumn::make('sector')
                     ->label('Sector')
@@ -73,51 +78,142 @@ class TrainingProgramsTable
                 TextColumn::make('graduated_at')
                     ->label('Graduated')
                     ->date('M d, Y')
+                    ->placeholder('Not graduated')
                     ->sortable()
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
 
-                TextColumn::make('status')
-                    ->label('Status')
-                    ->badge()
-                    ->color(fn (string $state): array => match ($state) {
-                        'COMPLETED'  => Color::Green,
-                        'ONGOING'    => Color::Amber,
-                        'DROPPED'    => Color::Red,
-                        'INCOMPLETE' => Color::Orange,
-                        default      => Color::Gray,
-                    })
-                    ->sortable(),
+                TextColumn::make('created_at')
+                    ->label('Recorded')
+                    ->dateTime('M d, Y')
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
-
+            ->defaultSort('from_date', 'desc')
+            ->recordUrl(fn (Training $record): string => TrainingProgramResource::getUrl('view', ['record' => $record]))
             ->filters([
                 SelectFilter::make('status')
                     ->label('Status')
-                    ->options([
-                        'COMPLETED'  => 'Completed',
-                        'ONGOING'    => 'Ongoing',
-                        'DROPPED'    => 'Dropped',
-                        'INCOMPLETE' => 'Incomplete',
-                    ]),
+                    ->options(TrainingStatus::class),
+
+                SelectFilter::make('training_type')
+                    ->label('Training type')
+                    ->searchable()
+                    ->options(fn (): array => Training::query()
+                        ->whereNotNull('training_type')
+                        ->distinct()
+                        ->orderBy('training_type')
+                        ->pluck('training_type', 'training_type')
+                        ->all()),
 
                 SelectFilter::make('sector')
                     ->label('Sector')
-                    ->options(fn () => Training::whereNotNull('sector')
+                    ->searchable()
+                    ->options(fn (): array => Training::query()
+                        ->whereNotNull('sector')
                         ->distinct()
+                        ->orderBy('sector')
                         ->pluck('sector', 'sector')
-                        ->toArray()
-                    ),
+                        ->all()),
 
-                Filter::make('from_date')
-                    ->label('This Year')
-                    ->query(fn (Builder $query) => $query->whereYear('from_date', now()->year)),
+                SelectFilter::make('year')
+                    ->label('Year')
+                    ->options(fn (): array => Training::query()
+                        ->selectRaw('YEAR(from_date) as year')
+                        ->distinct()
+                        ->orderByDesc('year')
+                        ->pluck('year', 'year')
+                        ->mapWithKeys(fn ($year): array => [(string) $year => (string) $year])
+                        ->all())
+                    ->query(function (Builder $query, array $data): Builder {
+                        $year = $data['value'] ?? null;
+
+                        return filled($year)
+                            ? $query->whereYear('from_date', $year)
+                            : $query;
+                    }),
             ])
-
             ->recordActions([
-                EditAction::make()
-                    ->color(Color::Amber),
+                ActionGroup::make([
+                    ViewAction::make(),
 
-                DeleteAction::make()
-                    ->color(Color::Red),
+                    EditAction::make(),
+
+                    Action::make('roster')
+                        ->label('View trainee roster')
+                        ->icon(Heroicon::UserGroup)
+                        ->url(fn (Training $record): string => TrainingProgramResource::getUrl('view', ['record' => $record])),
+
+                    Action::make('addTrainee')
+                        ->label('Add trainee')
+                        ->icon(Heroicon::UserPlus)
+                        ->url(fn (Training $record): string => TraineesResource::getUrl('create', ['training_id' => $record->getKey()])),
+
+                    Action::make('refreshBusiness')
+                        ->label('Refresh business details')
+                        ->icon(Heroicon::ArrowPath)
+                        ->action(function (Training $record): void {
+                            if ($record->refreshBusinessName()) {
+                                Notification::make()
+                                    ->success()
+                                    ->title('Business details refreshed')
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->warning()
+                                ->title('SCIMS details unavailable')
+                                ->body('The business name was left unchanged. Try again later.')
+                                ->send();
+                        }),
+
+                    DeleteAction::make()
+                        ->disabled(fn (Training $record): bool => $record->trainees()->exists())
+                        ->tooltip(fn (Training $record): ?string => $record->trainees()->exists()
+                            ? 'Remove or reassign this record\'s trainees first.'
+                            : null),
+                ])
+                    ->icon(Heroicon::EllipsisVertical)
+                    ->tooltip('Actions'),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    // Legacy rows and records saved while SCIMS was down can
+                    // have a blank business name; this fills them in bulk.
+                    BulkAction::make('refreshBusiness')
+                        ->label('Refresh business details')
+                        ->icon(Heroicon::ArrowPath)
+                        ->requiresConfirmation()
+                        ->modalHeading('Refresh business details from SCIMS')
+                        ->modalDescription('Selected records will have their business names updated from SCIMS. Records without a SCIMS match keep their current name.')
+                        ->action(function (Collection $records): void {
+                            $refreshed = 0;
+                            $skipped = 0;
+
+                            foreach ($records as $record) {
+                                $record->refreshBusinessName() ? $refreshed++ : $skipped++;
+                            }
+
+                            $notification = $refreshed > 0
+                                ? Notification::make()->success()->title($refreshed.' business record(s) refreshed')
+                                : Notification::make()->warning()->title('No business details could be refreshed');
+
+                            if ($skipped > 0) {
+                                $notification->body($skipped.' record(s) kept their existing name because SCIMS returned no match.');
+                            }
+
+                            $notification->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                ]),
+            ])
+            ->emptyStateIcon(Heroicon::AcademicCap)
+            ->emptyStateHeading('No training records yet')
+            ->emptyStateDescription('Create your first training record, then add the people who attended it.')
+            ->emptyStateActions([
+                CreateAction::make()
+                    ->label('New training record'),
             ]);
     }
 }
