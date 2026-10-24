@@ -2,7 +2,7 @@
 
 namespace App\Console\Commands;
 
-use App\Services\ScimsJuridicalApiService;
+use App\Services\CalamityMonitoring\ScimsBusinessRegistry;
 use Illuminate\Console\Command;
 
 class RefreshScimsBusinesses extends Command
@@ -11,7 +11,7 @@ class RefreshScimsBusinesses extends Command
 
     protected $description = 'Refresh the cached SCIMS business registry used by barangay filters';
 
-    public function handle(ScimsJuridicalApiService $scims): int
+    public function handle(ScimsBusinessRegistry $scims): int
     {
         $count = $scims->refreshAllBusinesses()->count();
 

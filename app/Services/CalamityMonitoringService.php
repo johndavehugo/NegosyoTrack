@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Services\CalamityMonitoring\ScimsBusinessRegistry;
 use App\Support\Barangays;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
@@ -22,7 +23,7 @@ class CalamityMonitoringService
 {
     protected const CACHE_TTL_SECONDS = 21600;
 
-    public function __construct(protected ScimsJuridicalApiService $scims) {}
+    public function __construct(protected ScimsBusinessRegistry $scims) {}
 
     /**
      * Live-search establishments from the cached SCIMS registry.

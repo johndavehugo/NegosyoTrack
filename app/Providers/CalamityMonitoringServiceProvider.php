@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Console\Commands\PruneIncidentDrafts;
 use App\Console\Commands\RefreshScimsBusinesses;
+use App\Services\CalamityMonitoring\ScimsBusinessRegistry;
 use App\Services\CalamityMonitoring\SnapshotCalamityFeed;
 use App\Services\EconomicMap\CalamityFeed;
 use App\Services\ScimsJuridicalApiService;
@@ -15,7 +16,8 @@ class CalamityMonitoringServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->app->singleton(ScimsJuridicalApiService::class);
+        $this->app->singleton(ScimsBusinessRegistry::class);
+        $this->app->alias(ScimsBusinessRegistry::class, ScimsJuridicalApiService::class);
         $this->app->bind(CalamityFeed::class, SnapshotCalamityFeed::class);
     }
 
