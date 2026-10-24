@@ -15,35 +15,29 @@
 
 ## About
 
-NegosyoTrack is a web-based management system built for the San Carlos City Negosyo Center, digitizing how the local government unit tracks, supports, and plans around its micro, small, and medium enterprises (MSMEs). It runs on Laravel with a Filament administration panel, backed by MySQL and a versioned JSON API that every module reads and writes through — one source of truth across the whole system.
+NegosyoTrack is a web-based management system built for the San Carlos City Negosyo Center, digitizing how the local government unit tracks, supports, and plans around its micro, small, and medium enterprises (MSMEs). It runs on Laravel with a Filament administration panel. Business and address records are read from the external SCIMS juridical API; calamity monitoring and price monitoring data remain in MySQL.
 
-At its core is the MSME registry: juridical businesses, their employers, and their addresses. Business creation runs through a guided two-step wizard with cascading region–province–city–barangay selects and live SCIMS search that autocompletes records from the external registry, while updates flow through dedicated API endpoints for business details, employer data, addresses, status changes, and renewals.
+At its core is the MSME registry: juridical businesses and their addresses. The registry list and profile views query SCIMS directly; address reference selects use the Philippine address API.
 
-Built on top of the registry is the Economic Map module — interactive MapLibre-powered maps turning records into decision support: hotspot, distribution, risk, and opportunity views, plus a workbench for geocoding unmapped records. Calamity monitoring (events, incidents, damage costs) feeds the risk model, and price monitoring (agencies, commodities, prevailing vs. SRP prices) covers market oversight. One workspace for registration, disaster response, market monitoring, and economic planning.
+Built on top of the registry is the Economic Map module — interactive MapLibre-powered maps turning SCIMS records into decision support: hotspot, distribution, risk, and opportunity views. SCIMS provides address text but no latitude/longitude, so aggregate maps plot barangays at configurable centres and individual pins are shown only when real coordinates exist. The risk view is a true MapLibre heat layer — the blur is risk intensity, red where barangays are most risk-prone and blue where least, and each barangay's marker dot carries the exposure × damage risk band. Calamity monitoring (events, incidents, damage costs) feeds the risk model, and price monitoring (agencies, commodities, prevailing vs. SRP prices) covers market oversight. One workspace for registration, disaster response, market monitoring, and economic planning.
 
 ## Features
 
 ### Command Dashboard
 
-At-a-glance KPIs on login — registered and active MSMEs, calamity events with affected-business counts, total recorded damages, monitored commodities, and geocoded coverage — above monthly registration/renewal, category-breakdown, and industry-distribution charts.
+At-a-glance KPIs on login — registered and active MSMEs, calamity events with affected-business counts, total recorded damages, and monitored commodities — above monthly registration/renewal, category-breakdown, and industry-distribution charts.
 
 ![Dashboard](public/images/readme/dashboard.png)
 
 ### MSME Registry
 
-Businesses, employers, and addresses with full list, view, create, and edit flows — search, filters, category badges, and status management included.
+Businesses and addresses with list and profile views, search, and status badges — sourced from SCIMS.
 
 ![Businesses table](public/images/readme/business_table.png)
 
-### Guided Creation Wizard
-
-Two-step business + employer capture with SCIMS registry search that autocompletes the form, cascading Philippine address dropdowns, and inline validation.
-
-![Create wizard](public/images/readme/wizard_step_1.png)
-
 ### Business Profiles
 
-Full record view across personal, business, and address sections — contact and financial editing, status changes, and renewals, all synced through the API.
+Full record view across owner, business, and address sections, queried from SCIMS by entity number.
 
 ![Business profile](public/images/readme/view_business.png)
 
@@ -65,11 +59,9 @@ Investment and development guidance per barangay — commercial density, new-reg
 
 ![Opportunity map](public/images/readme/opportunity.png)
 
-### Location Workbench
+### Business Locations Directory
 
-Every address missing coordinates, in one table — drop a pin on the mini-map or type coordinates to locate records, with changes reflected on the maps immediately.
-
-![Unset locations](public/images/readme/unset_locations.png)
+A read-only, searchable directory of SCIMS businesses with formatted addresses, barangay, industry, and registration status. Selecting a row opens the business profile.
 
 ### Sign-in
 
@@ -88,20 +80,22 @@ Every address missing coordinates, in one table — drop a pin on the mini-map o
 | Styling | Tailwind CSS 4 |
 | Build | Vite |
 
-## API Overview
+## Data Sources
 
-All modules consume these JSON endpoints (`routes/api.php`):
+| Source | Used for |
+|---|---|
+| SCIMS juridical API (`ScimsJuridicalApiService`) | Business list, business profiles, and address fields |
+| MySQL | Calamity events/incidents, price monitoring, users, cache, and queues |
+| `AddressApiService` | Philippine region/province/city/barangay reference data and population |
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/api/msme` | Business list (supports `?search=`) |
-| `POST` | `/api/msme` | Create business + employer + addresses |
-| `PUT` | `/api/msme/employer/{entity_no}` | Update employer |
-| `PUT` | `/api/msme/juridical/{entity_no}` | Update business |
-| `PUT` | `/api/msme/address/{address}` | Update address |
-| `PATCH` | `/api/msme/status/{juridical}` | Change business status |
-| `PATCH` | `/api/msme/renew/{juridical}` | Renew business |
-| `PATCH` | `/api/msme/location/{address}` | Save coordinates |
+The Economic Map reads a cached SCIMS snapshot. Refresh it manually or let the scheduler keep it current:
+
+```bash
+php artisan economic-map:sync
+php artisan schedule:work   # or run the scheduler in production
+```
+
+The map's “Refresh data” action queues the same sync job, so run a queue worker (`php artisan queue:work`) where background jobs are enabled. The snapshot is stored in a dedicated file cache (`storage/framework/cache/economic-map`) so multi-megabyte SCIMS payloads never hit the MySQL cache. Set `ECONOMIC_MAP_CACHE_STORE` to another Laravel cache store if needed.
 
 ## Getting Started
 
@@ -121,7 +115,10 @@ npm run build
 # 4. Migrate (full schema ships in database/migrations)
 php artisan migrate
 
-# 5. Serve (or use Laravel Herd: https://herd.laravel.com)
+# 5. Warm the Economic Map snapshot
+php artisan economic-map:sync
+
+# 6. Serve (or use Laravel Herd: https://herd.laravel.com)
 php artisan serve
 ```
 
@@ -133,27 +130,22 @@ Then sign in at the app URL with an existing user account.
 app/
 ├── Filament/
 │   ├── Pages/EconomicMap/        # Hotspot, Distribution, Risk, Opportunity, Business Locations
-│   └── Resources/
-│       ├── MsmeManagement/Juridicals/   # Business resource, wizard, tables, schemas
-│       ├── CalamityMonitoring/          # Calamity resources
-│       └── PriceMonitoring/             # Price monitoring resources
-├── Http/Controllers/Api/
-│   └── MsmeController.php        # msme.* JSON endpoints
-├── Models/
-│   ├── MsmeManagement/           # Juridical, Employer, Address
-│   └── PriceMonitoring/          # Agency, ...
-└── Services/
-    ├── ScimsApiService.php       # SCIMS registry client
-    ├── AddressApiService.php     # Philippine address reference data
-    ├── AddressManager.php        # Cascading dropdown orchestration
-    ├── EconomicMapService.php    # Map aggregates (hotspot, distribution, search)
-    └── EconomicMap/CalamityFeed.php  # Damage history feed
+│   ├── Pages/Msme/               # SCIMS business list and profile
+│   └── Resources/                # Calamity and price monitoring resources
+├── Jobs/
+│   └── SyncEconomicMapData.php   # Queued SCIMS snapshot refresh
+├── Console/Commands/
+│   └── SyncEconomicMap.php       # economic-map:sync
+├── Services/
+│   ├── ScimsJuridicalApiService.php # SCIMS business + address client
+│   ├── AddressApiService.php     # Philippine address reference data
+│   ├── AddressManager.php        # Cascading dropdown orchestration
+│   ├── EconomicMapService.php    # Map aggregates (hotspot, distribution, search)
+│   └── EconomicMap/CalamityFeed.php  # MySQL damage history feed
 ├── Enums/
 │   └── Industries.php            # Canonical 17-sector list
 config/
-└── economic-map.php              # Map bands, sector colors, cache TTL
-routes/
-└── api.php                       # API endpoint definitions
+└── economic-map.php              # Map bands, sector colors, cache TTL, barangay centres
 ```
 
 ## License

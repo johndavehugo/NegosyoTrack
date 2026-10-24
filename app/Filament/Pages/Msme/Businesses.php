@@ -14,6 +14,8 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Pagination\LengthAwarePaginator;
 use App\Filament\Pages\Msme\ViewBusiness;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 
 class Businesses extends Page implements HasTable
 {
@@ -21,6 +23,36 @@ class Businesses extends Page implements HasTable
     protected string $view = 'filament.pages.msme.businesses';
     protected static ?string $navigationLabel = 'Business List';
     protected static string|BackedEnum|null $navigationIcon = Heroicon::BuildingOffice2;
+
+    public static function getNavigationBadgeColor(): string|array|null
+    {
+        return 'info';
+    }
+
+    public static function getNavigationBadge(): ?string
+    {
+        try {
+            return Cache::remember('total_businesses', 300, function () {
+
+                $response = Http::timeout(5)->get('https://cictd.app/api/scims/juridical');
+
+                if ($response && $response->successful()) {
+                    return $response->json('meta.total');
+                }
+
+                return null;
+            });
+        } catch (\Throwable $e) {
+            logger()->error('Badge API Breakdown: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    public static function getNavigationBadgeTooltip(): ?string
+    {
+        return 'Total Registered Businesses';
+    }
+
     public static function getNavigationGroup(): ?string
     {
         return 'Msme Management';

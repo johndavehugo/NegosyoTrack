@@ -45,7 +45,8 @@ class NegosyotrackPanelProvider extends PanelProvider
 
             ->navigationGroups([
                 NavigationGroup::make()
-                    ->label('Msme Management'),
+                    ->label('Msme Management')
+                    ->icon(Heroicon::BuildingOffice2),
 
                 NavigationGroup::make()
                     ->label('Training & Capacity Building')
@@ -55,10 +56,12 @@ class NegosyotrackPanelProvider extends PanelProvider
                     ->label('Calamity Monitoring'),
 
                 NavigationGroup::make()
-                    ->label('Price Monitoring'),
+                    ->label('Price Monitoring')
+                    ->icon(Heroicon::PresentationChartLine),
 
                 NavigationGroup::make()
-                    ->label('Economic Map'),
+                    ->label('Economic Map')
+                    ->icon(Heroicon::GlobeAsiaAustralia),
             ])
 
             ->colors([

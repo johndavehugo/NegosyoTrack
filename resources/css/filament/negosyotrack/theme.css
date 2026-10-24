@@ -19,3 +19,31 @@
     padding-block: 0;
     min-height: 4rem;
 }
+
+/* MapLibre popups always have a white background, but Filament's dark theme
+   turns inherited body text white — making the popup content invisible.
+   Pin the popup text colour so business details stay readable in both modes. */
+.maplibregl-popup-content {
+    background: #fff;
+    color: #111827;
+    /* Extra right padding keeps text clear of MapLibre's close button. */
+    padding: 0.625rem 1.75rem 0.625rem 0.75rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+
+.maplibregl-popup-content p {
+    color: #111827;
+}
+
+.maplibregl-popup-close-button {
+    color: #6b7280;
+    font-size: 1rem;
+    padding: 0 0.25rem;
+}
+
+/* Hover tooltips must never intercept the pointer. */
+.emap-pin-tooltip,
+.emap-pin-tooltip * {
+    pointer-events: none;
+}
