@@ -8,6 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // The trainings table was created manually on early installs, before
+        // this migration existed. Guard so those databases can still migrate.
+        if (Schema::hasTable('trainings')) {
+            return;
+        }
+
         Schema::create('trainings', function (Blueprint $table) {
             $table->string('id', 100)->primary()->collation('utf8mb4_general_ci'); // trin-{uuid}
             $table->string('entity_no', 50)->collation('utf8mb4_general_ci')->index(); // standalone — no FK
