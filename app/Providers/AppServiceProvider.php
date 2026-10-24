@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\Filesystem;
 use App\Models\PriceMonitoring\CommodityVariant;
 use App\Observers\PriceMonitoring\CommodityVariantObserver;
 use Filament\Support\Facades\FilamentColor;
@@ -14,7 +15,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Windows-safe replacement used when Blade compiles view files.
+        $this->app->singleton('files', fn () => new Filesystem);
     }
 
     /**

@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'scims' => [
+        'base_url' => env('SCIMS_BASE_URL', 'https://cictd.app/api/scims'),
+    ],
+
 ];

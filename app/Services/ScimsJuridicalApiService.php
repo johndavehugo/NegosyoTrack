@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 class ScimsJuridicalApiService
 {
 
-    public function getBusiness(int $page, int $recordsPerPage, $search, ?string $sortColumn, ?string $sortDirection)
+    public function getBusiness(?int $page, ?int $recordsPerPage, ?string $search, ?string $sortColumn, ?string $sortDirection)
     {
         $response = Http::baseUrl('http://cictd.app/api/scims')
             ->get('juridical?include=employees.information,organization,address,owner.information,employer&expand=details', [
