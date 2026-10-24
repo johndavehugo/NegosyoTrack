@@ -2,7 +2,7 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Training\TrainingInfo;
+use App\Models\Training\Training;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
 use Filament\Widgets\StatsOverviewWidget;
@@ -16,11 +16,11 @@ class TrainingStatsWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $total      = TrainingInfo::count();
-        $completed  = TrainingInfo::where('status', 'COMPLETED')->count();
-        $ongoing    = TrainingInfo::where('status', 'ONGOING')->count();
-        $thisYear   = TrainingInfo::whereYear('from_date', now()->year)->count();
-        $businesses = TrainingInfo::distinct('entity_no')->count('entity_no');
+        $total      = Training::count();
+        $completed  = Training::where('status', 'COMPLETED')->count();
+        $ongoing    = Training::where('status', 'ONGOING')->count();
+        $thisYear   = Training::whereYear('from_date', now()->year)->count();
+        $businesses = Training::distinct('entity_no')->count('entity_no');
 
         return [
             Stat::make('Training Records', number_format($total))

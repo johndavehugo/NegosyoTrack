@@ -7,7 +7,7 @@ use App\Filament\Resources\Training\TrainingPrograms\Pages\EditTrainingProgram;
 use App\Filament\Resources\Training\TrainingPrograms\Pages\ListTrainingPrograms;
 use App\Filament\Resources\Training\TrainingPrograms\Schemas\TrainingProgramForm;
 use App\Filament\Resources\Training\TrainingPrograms\Tables\TrainingProgramsTable;
-use App\Models\Training\TrainingInfo;
+use App\Models\Training\Training;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -16,7 +16,7 @@ use Filament\Tables\Table;
 
 class TrainingProgramResource extends Resource
 {
-    protected static ?string $model = TrainingInfo::class;
+    protected static ?string $model = Training::class;
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::AcademicCap;
 

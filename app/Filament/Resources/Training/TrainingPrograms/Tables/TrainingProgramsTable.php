@@ -2,7 +2,8 @@
 
 namespace App\Filament\Resources\Training\TrainingPrograms\Tables;
 
-use App\Models\Training\TrainingInfo;
+use App\Models\Training\Training;
+use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Support\Colors\Color;
 use Filament\Tables\Columns\TextColumn;
@@ -17,22 +18,21 @@ class TrainingProgramsTable
     {
         return $table
             ->columns([
-                TextColumn::make('juridical.name')
-                    ->label('Business Name')
-                    ->searchable()
-                    ->sortable(),
-
                 TextColumn::make('entity_no')
                     ->label('Entity No.')
                     ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->sortable()
+                    ->copyable()
+                    ->copyMessage('Copied!')
+                    ->badge()
+                    ->color('gray'),
 
                 TextColumn::make('training_program')
                     ->label('Training Program')
                     ->searchable()
                     ->sortable()
                     ->limit(45)
-                    ->tooltip(fn (TrainingInfo $record): string => $record->training_program),
+                    ->tooltip(fn (Training $record): string => $record->training_program),
 
                 TextColumn::make('training_type')
                     ->label('Type')
@@ -101,7 +101,7 @@ class TrainingProgramsTable
 
                 SelectFilter::make('sector')
                     ->label('Sector')
-                    ->options(fn () => TrainingInfo::whereNotNull('sector')
+                    ->options(fn () => Training::whereNotNull('sector')
                         ->distinct()
                         ->pluck('sector', 'sector')
                         ->toArray()
@@ -115,6 +115,9 @@ class TrainingProgramsTable
             ->recordActions([
                 EditAction::make()
                     ->color(Color::Amber),
+
+                DeleteAction::make()
+                    ->color(Color::Red),
             ]);
     }
 }

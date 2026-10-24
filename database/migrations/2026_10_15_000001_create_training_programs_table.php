@@ -8,9 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('training_info', function (Blueprint $table) {
-            $table->string('training_id', 100)->primary()->collation('utf8mb4_general_ci'); // trin-{uuid}
-            $table->string('entity_no', 50)->collation('utf8mb4_general_ci')->index(); // FK → juridicals.entity_no
+        Schema::create('trainings', function (Blueprint $table) {
+            $table->string('id', 100)->primary()->collation('utf8mb4_general_ci'); // trin-{uuid}
+            $table->string('entity_no', 50)->collation('utf8mb4_general_ci')->index(); // standalone — no FK
             $table->string('training_program', 300);         // full program name (free text)
             $table->date('from_date');
             $table->date('to_date');
@@ -21,16 +21,11 @@ return new class extends Migration
             $table->date('graduated_at')->nullable();
             $table->string('status', 50)->default('COMPLETED');
             $table->timestamps();
-
-            $table->foreign('entity_no')
-                ->references('entity_no')
-                ->on('juridicals')
-                ->onDelete('cascade');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('training_info');
+        Schema::dropIfExists('trainings');
     }
 };

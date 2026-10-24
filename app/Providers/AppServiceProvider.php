@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Support\Filesystem;
 use Filament\Support\Facades\FilamentColor;
 use Illuminate\Support\ServiceProvider;
 
@@ -12,7 +13,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Windows-safe replacement used when Blade compiles view files.
+        $this->app->singleton('files', fn () => new Filesystem);
     }
 
     /**

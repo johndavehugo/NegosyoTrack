@@ -2,22 +2,18 @@
 
 namespace App\Models\Training;
 
-use App\Models\MsmeManagement\Juridical;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class TrainingInfo extends Model
+class Training extends Model
 {
-    protected $table = 'training_info';
-
-    protected $primaryKey = 'training_id';
+    protected $table = 'trainings';
 
     public $incrementing = false;
 
     protected $keyType = 'string';
 
     protected $fillable = [
-        'training_id',
+        'id',
         'entity_no',
         'training_program',
         'from_date',
@@ -33,15 +29,10 @@ class TrainingInfo extends Model
     protected function casts(): array
     {
         return [
-            'from_date'    => 'date',
-            'to_date'      => 'date',
+            'from_date' => 'date',
+            'to_date' => 'date',
             'graduated_at' => 'date',
-            'hours_no'     => 'integer',
+            'hours_no' => 'integer',
         ];
-    }
-
-    public function juridical(): BelongsTo
-    {
-        return $this->belongsTo(Juridical::class, 'entity_no', 'entity_no');
     }
 }

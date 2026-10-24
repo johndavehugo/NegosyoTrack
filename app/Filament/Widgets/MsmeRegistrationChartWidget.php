@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\MsmeManagement\Juridical;
 use Leandrocfe\FilamentApexCharts\Widgets\ApexChartWidget;
 
 class MsmeRegistrationChartWidget extends ApexChartWidget
@@ -11,7 +10,7 @@ class MsmeRegistrationChartWidget extends ApexChartWidget
 
     protected static ?string $heading = 'Monthly Business Registrations & Renewals';
 
-    protected static ?string $subheading = 'New registrations vs. renewals per month — current year';
+    protected static ?string $subheading = 'Data available once SCIMS aggregate endpoint is connected';
 
     protected static ?int $sort = 2;
 
@@ -27,62 +26,34 @@ class MsmeRegistrationChartWidget extends ApexChartWidget
             return [];
         }
 
-        $year = now()->year;
-
-        // Build month-indexed counts for New and Renewal
-        $new     = array_fill(1, 12, 0);
-        $renewal = array_fill(1, 12, 0);
-
-        Juridical::selectRaw('MONTH(created_at) as month, registration_type, COUNT(*) as total')
-            ->whereYear('created_at', $year)
-            ->groupBy('month', 'registration_type')
-            ->get()
-            ->each(function ($row) use (&$new, &$renewal) {
-                $m = (int) $row->month;
-                if ($row->registration_type === 'NEW') {
-                    $new[$m] = (int) $row->total;
-                } elseif ($row->registration_type === 'RENEWAL') {
-                    $renewal[$m] = (int) $row->total;
-                }
-            });
-
         $months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
         return [
             'chart' => [
-                'type'    => 'bar',
-                'height'  => 300,
-                'stacked' => false,
-                'toolbar' => ['show' => false],
+                'type'       => 'bar',
+                'height'     => 300,
+                'stacked'    => false,
+                'toolbar'    => ['show' => false],
                 'fontFamily' => 'inherit',
             ],
             'series' => [
-                [
-                    'name' => 'New Registrations',
-                    'data' => array_values($new),
-                ],
-                [
-                    'name' => 'Renewals',
-                    'data' => array_values($renewal),
-                ],
+                ['name' => 'New Registrations', 'data' => array_fill(0, 12, 0)],
+                ['name' => 'Renewals',           'data' => array_fill(0, 12, 0)],
             ],
             'xaxis' => [
                 'categories' => $months,
-                'labels'     => [
-                    'style' => ['fontFamily' => 'inherit', 'fontWeight' => 600],
-                ],
+                'labels'     => ['style' => ['fontFamily' => 'inherit', 'fontWeight' => 600]],
             ],
             'yaxis' => [
-                'labels' => [
-                    'style' => ['fontFamily' => 'inherit'],
-                ],
+                'min'    => 0,
+                'labels' => ['style' => ['fontFamily' => 'inherit']],
             ],
             'colors'      => ['#DC2626', '#1D4ED8'],
             'plotOptions' => [
                 'bar' => [
-                    'borderRadius'      => 4,
-                    'columnWidth'       => '55%',
+                    'borderRadius'            => 4,
+                    'columnWidth'             => '55%',
                     'borderRadiusApplication' => 'end',
                 ],
             ],
@@ -93,11 +64,18 @@ class MsmeRegistrationChartWidget extends ApexChartWidget
                 'fontWeight' => 600,
             ],
             'grid' => [
-                'borderColor' => '#f1f5f9',
+                'borderColor'     => '#f1f5f9',
                 'strokeDashArray' => 4,
             ],
-            'tooltip' => [
-                'style' => ['fontFamily' => 'inherit'],
+            'tooltip' => ['enabled' => false],
+            'noData'  => [
+                'text'          => 'Awaiting SCIMS data',
+                'align'         => 'center',
+                'verticalAlign' => 'middle',
+                'style'         => [
+                    'color'    => '#9ca3af',
+                    'fontSize' => '13px',
+                ],
             ],
         ];
     }

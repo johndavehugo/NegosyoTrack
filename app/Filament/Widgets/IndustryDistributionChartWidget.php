@@ -27,38 +27,28 @@ class IndustryDistributionChartWidget extends ApexChartWidget
             return [];
         }
 
-        /** @var EconomicMapService $service */
-        $service = app(EconomicMapService::class);
-        $distribution = $service->distribution();
+        $labels = [];
+        $data   = [];
+        $colors = ['#e5e7eb'];
 
-        // Top 8 sectors by count
-        $sectors = collect($distribution['sectors'])
-            ->filter(fn ($s) => $s['count'] > 0)
-            ->take(8);
+        try {
+            /** @var EconomicMapService $service */
+            $service      = app(EconomicMapService::class);
+            $distribution = $service->distribution();
 
-        $labels = $sectors->pluck('name')
-            ->map(fn ($n) => strlen($n) > 30 ? substr($n, 0, 27).'...' : $n)
-            ->values()
-            ->toArray();
+            $sectors = collect($distribution['sectors'])
+                ->filter(fn ($s) => $s['count'] > 0)
+                ->take(8);
 
-        $data   = $sectors->pluck('count')->values()->toArray();
-        $colors = $sectors->pluck('color')->values()->toArray();
-
-        // Fallback if no geocoded data: use raw DB counts grouped by line_of_industry
-        if (empty($data)) {
-            $rows = \App\Models\MsmeManagement\Juridical::selectRaw('line_of_industry, COUNT(*) as total')
-                ->whereNotNull('line_of_industry')
-                ->groupBy('line_of_industry')
-                ->orderByDesc('total')
-                ->limit(8)
-                ->get();
-
-            $labels = $rows->pluck('line_of_industry')
-                ->map(fn ($n) => strlen($n) > 30 ? substr($n, 0, 27).'...' : $n)
-                ->toArray();
-            $data   = $rows->pluck('total')->map(fn ($v) => (int) $v)->toArray();
-            $colors = ['#DC2626', '#B91C1C', '#991B1B', '#7F1D1D',
-                       '#EF4444', '#F87171', '#FCA5A5', '#FEE2E2'];
+            if ($sectors->isNotEmpty()) {
+                $labels = $sectors->pluck('name')
+                    ->map(fn ($n) => strlen($n) > 30 ? substr($n, 0, 27).'...' : $n)
+                    ->values()->toArray();
+                $data   = $sectors->pluck('count')->values()->toArray();
+                $colors = $sectors->pluck('color')->values()->toArray();
+            }
+        } catch (\Throwable) {
+            // Service unavailable — keep placeholder
         }
 
         return [
@@ -109,6 +99,15 @@ class IndustryDistributionChartWidget extends ApexChartWidget
                 'strokeDashArray' => 4,
             ],
             'tooltip' => ['style' => ['fontFamily' => 'inherit']],
+            'noData'  => [
+                'text'          => 'No geocoded business data yet',
+                'align'         => 'center',
+                'verticalAlign' => 'middle',
+                'style'         => [
+                    'color'    => '#9ca3af',
+                    'fontSize' => '13px',
+                ],
+            ],
         ];
     }
 }
