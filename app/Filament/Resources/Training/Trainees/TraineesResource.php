@@ -31,6 +31,8 @@ class TraineesResource extends Resource
 
     protected static ?string $modelLabel = 'Trainee';
 
+    protected static ?int $navigationSort = 2;
+
     protected static ?string $recordTitleAttribute = 'full_name';
 
     public static function getNavigationGroup(): ?string
@@ -55,7 +57,7 @@ class TraineesResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with('training');
+        return parent::getEloquentQuery()->with(['training', 'trainingDetails']);
     }
 
     public static function getRecordTitle(?Model $record): string|Htmlable|null
