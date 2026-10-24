@@ -27,18 +27,14 @@ class IndustryDistributionChartWidget extends ApexChartWidget
             return [];
         }
 
-        $labels = [];
-        $data   = [];
-        $colors = ['#e5e7eb'];
+        /** @var EconomicMapService $service */
+        $service = app(EconomicMapService::class);
+        $distribution = $service->distribution();
 
-        try {
-            /** @var EconomicMapService $service */
-            $service      = app(EconomicMapService::class);
-            $distribution = $service->distribution();
-
-            $sectors = collect($distribution['sectors'])
-                ->filter(fn ($s) => $s['count'] > 0)
-                ->take(8);
+        // Top 8 sectors by count
+        $sectors = collect($distribution['sectors'])
+            ->filter(fn ($s) => $s['count'] > 0)
+            ->take(8);
 
         $labels = $sectors->pluck('name')
             ->map(fn ($n) => strlen($n) > 30 ? substr($n, 0, 27).'...' : $n)
@@ -95,15 +91,6 @@ class IndustryDistributionChartWidget extends ApexChartWidget
                 'strokeDashArray' => 4,
             ],
             'tooltip' => ['style' => ['fontFamily' => 'inherit']],
-            'noData'  => [
-                'text'          => 'No geocoded business data yet',
-                'align'         => 'center',
-                'verticalAlign' => 'middle',
-                'style'         => [
-                    'color'    => '#9ca3af',
-                    'fontSize' => '13px',
-                ],
-            ],
         ];
     }
 }

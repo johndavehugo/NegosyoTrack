@@ -45,7 +45,8 @@ class NegosyotrackPanelProvider extends PanelProvider
 
             ->navigationGroups([
                 NavigationGroup::make()
-                    ->label('Msme Management'),
+                    ->label('Msme Management')
+                    ->icon(Heroicon::BuildingOffice2),
 
                 NavigationGroup::make()
                     ->label('Training & Capacity Building')
