@@ -59,6 +59,15 @@ return [
             'path' => env('CACHE_STORAGE_PATH', 'framework/cache/data'),
         ],
 
+        // Large Economic Map snapshot. The database driver closes the
+        // connection when a multi-megabyte SCIMS payload exceeds the
+        // server's max_allowed_packet, so this store stays on disk.
+        'economic-map' => [
+            'driver' => 'file',
+            'path' => storage_path('framework/cache/economic-map'),
+            'lock_path' => storage_path('framework/cache/economic-map'),
+        ],
+
         'memcached' => [
             'driver' => 'memcached',
             'persistent_id' => env('MEMCACHED_PERSISTENT_ID'),

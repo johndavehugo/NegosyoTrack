@@ -40,23 +40,19 @@ class IndustryDistributionChartWidget extends ApexChartWidget
                 ->filter(fn ($s) => $s['count'] > 0)
                 ->take(8);
 
-            if ($sectors->isNotEmpty()) {
-                $labels = $sectors->pluck('name')
-                    ->map(fn ($n) => strlen($n) > 30 ? substr($n, 0, 27).'...' : $n)
-                    ->values()->toArray();
-                $data   = $sectors->pluck('count')->values()->toArray();
-                $colors = $sectors->pluck('color')->values()->toArray();
-            }
-        } catch (\Throwable) {
-            // Service unavailable — keep placeholder
-        }
+        $labels = $sectors->pluck('name')
+            ->map(fn ($n) => strlen($n) > 30 ? substr($n, 0, 27).'...' : $n)
+            ->values()
+            ->toArray();
+
+        $data = $sectors->pluck('count')->values()->toArray();
 
         return [
             'chart' => [
-                'type'       => 'bar',
-                'height'     => 320,
+                'type' => 'bar',
+                'height' => 320,
                 'fontFamily' => 'inherit',
-                'toolbar'    => ['show' => false],
+                'toolbar' => ['show' => false],
             ],
             'series' => [
                 [
@@ -66,36 +62,36 @@ class IndustryDistributionChartWidget extends ApexChartWidget
             ],
             'xaxis' => [
                 'categories' => $labels,
-                'labels'     => [
+                'labels' => [
                     'style' => ['fontFamily' => 'inherit', 'fontSize' => '11px'],
-                    'trim'  => true,
+                    'trim' => true,
                 ],
             ],
             'yaxis' => [
                 'labels' => ['style' => ['fontFamily' => 'inherit']],
             ],
-            'colors'      => ['#DC2626'],
+            'colors' => ['#DC2626'],
             'plotOptions' => [
                 'bar' => [
-                    'horizontal'        => true,
-                    'borderRadius'      => 4,
-                    'distributed'       => true,
-                    'barHeight'         => '65%',
-                    'dataLabels'        => ['position' => 'top'],
+                    'horizontal' => true,
+                    'borderRadius' => 4,
+                    'distributed' => true,
+                    'barHeight' => '65%',
+                    'dataLabels' => ['position' => 'top'],
                 ],
             ],
             'dataLabels' => [
-                'enabled'  => true,
-                'offsetX'  => 14,
-                'style'    => [
+                'enabled' => true,
+                'offsetX' => 14,
+                'style' => [
                     'fontFamily' => 'inherit',
                     'fontWeight' => 700,
-                    'colors'    => ['#0f172a'],
+                    'colors' => ['#0f172a'],
                 ],
             ],
             'legend' => ['show' => false],
-            'grid'   => [
-                'borderColor'     => '#f1f5f9',
+            'grid' => [
+                'borderColor' => '#f1f5f9',
                 'strokeDashArray' => 4,
             ],
             'tooltip' => ['style' => ['fontFamily' => 'inherit']],

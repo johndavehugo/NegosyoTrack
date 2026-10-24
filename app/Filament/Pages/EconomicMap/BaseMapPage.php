@@ -2,8 +2,10 @@
 
 namespace App\Filament\Pages\EconomicMap;
 
+use App\Jobs\SyncEconomicMapData;
 use App\Services\EconomicMapService;
 use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
@@ -11,7 +13,7 @@ use Livewire\Attributes\On;
 
 /**
  * Shared behaviour for the Economic Map pages: sidebar grouping,
- * area search, data refresh, and the unset-location pill count.
+ * area search, and data refresh.
  */
 abstract class BaseMapPage extends Page
 {
@@ -21,13 +23,16 @@ abstract class BaseMapPage extends Page
 
     public array $searchResults = [];
 
-    public int $unsetCount = 0;
-
     public ?array $summary = null;
 
     public array $pins = [];
 
+    /** Every exact set-location pin rendered on page load. */
+    public array $mapPins = [];
+
     public string $selectedBarangay = '';
+
+    public int $unsetCount = 0;
 
     public static function getNavigationGroup(): ?string
     {
@@ -43,18 +48,24 @@ abstract class BaseMapPage extends Page
                 ->color('gray')
                 ->requiresConfirmation()
                 ->modalHeading('Refresh map data?')
-                ->modalDescription('Re-fetches GET /api/msme and rebuilds every figure on this page.')
+                ->modalDescription('Fetches the latest business registry from SCIMS and rebuilds every figure on this page.')
                 ->action(function (): void {
-                    app(EconomicMapService::class)->refresh();
-                    $this->loadData();
-                    $this->dispatch('emap-data-refreshed');
+                    SyncEconomicMapData::dispatch();
+
+                    Notification::make()
+                        ->title('SCIMS sync queued')
+                        ->body('The map will use the new snapshot when the background sync finishes.')
+                        ->success()
+                        ->send();
                 }),
         ];
     }
 
     public function updatedSearchQuery(): void
     {
-        $this->searchResults = app(EconomicMapService::class)->searchArea($this->searchQuery);
+        $service = app(EconomicMapService::class);
+
+        $this->searchResults = $service->searchArea($this->searchQuery, $this->mapRows($service));
     }
 
     public function clearSearch(): void
@@ -71,9 +82,10 @@ abstract class BaseMapPage extends Page
         }
 
         $service = app(EconomicMapService::class);
+        $rows = $this->mapRows($service);
 
-        $this->summary = $service->areaSummary($barangay);
-        $this->pins = $service->barangayBusinesses($barangay);
+        $this->summary = $service->areaSummary($barangay, null, $rows);
+        $this->pins = $service->barangayBusinesses($barangay, $rows);
         $this->clearSearch();
 
         $this->dispatch('emap-focus', [
@@ -97,9 +109,10 @@ abstract class BaseMapPage extends Page
         }
 
         $service = app(EconomicMapService::class);
+        $rows = $this->mapRows($service);
 
-        $this->summary = $service->areaSummary($match['barangay'], $match['street']);
-        $this->pins = $service->barangayBusinesses($match['barangay']);
+        $this->summary = $service->areaSummary($match['barangay'], $match['street'], $rows);
+        $this->pins = $service->barangayBusinesses($match['barangay'], $rows);
         $this->clearSearch();
 
         $this->dispatch('emap-focus-street', [
@@ -133,6 +146,38 @@ abstract class BaseMapPage extends Page
         $this->selectBarangay($barangay);
     }
 
+    /**
+     * Rows this page should operate on. Map pages that show only located
+     * businesses override onlyLocated(); every other page keeps all rows.
+     *
+     * @return array<int, array>|null
+     */
+    protected function mapRows(EconomicMapService $service): ?array
+    {
+        return $this->onlyLocated() ? $service->locatedBusinessRows() : null;
+    }
+
+    /** Whether this page only considers businesses with a set location. */
+    protected function onlyLocated(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Load the exact set-location pins every map view renders on load.
+     * Coincident pins receive display-only offsets so none are hidden.
+     */
+    protected function loadMapPins(EconomicMapService $service): void
+    {
+        $this->mapPins = $service->displayPins($service->locatedPins());
+    }
+
+    /**
+     * Number of SCIMS businesses whose entity number has no `locations` row.
+     *
+     * Only map pages that render the unset pill call this; the Business
+     * Locations table re-renders on pagination and does not pay for the scan.
+     */
     protected function loadUnsetCount(): void
     {
         $this->unsetCount = app(EconomicMapService::class)->unsetCount();
