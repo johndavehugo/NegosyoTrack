@@ -1,5 +1,13 @@
 <x-filament-panels::page>
     <link rel="stylesheet" href="{{ asset('vendor/maplibre/maplibre-gl.css') }}">
+    @include('filament.pages.economic-map.partials.controls')
+
+    @php
+        $heatGradient = 'linear-gradient(90deg, '.collect(config('economic-map.heat_ramp', []))
+            ->sortBy('stop')
+            ->map(fn (array $stop): string => sprintf('%s %s%%', $stop['color'], round($stop['stop'] * 100, 2)))
+            ->implode(', ').')';
+    @endphp
 
     <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div class="w-full max-w-xl">
@@ -12,10 +20,10 @@
 
     @if (! $hasData)
         <div class="rounded-lg bg-white p-8 text-center shadow-sm dark:bg-gray-900">
-            <p class="text-lg font-semibold text-gray-900 dark:text-white">No geocoded businesses yet</p>
+            <p class="text-lg font-semibold text-gray-900 dark:text-white">No business data yet</p>
             <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">
-                Risk scoring needs business locations to compute exposure. Set them in
-                <a href="{{ \App\Filament\Pages\EconomicMap\BusinessLocations::getUrl() }}" class="font-medium text-blue-700 hover:underline">Business Locations</a>.
+                Risk scoring needs SCIMS business records to compute exposure. Run
+                <span class="font-mono">php artisan economic-map:sync</span> or wait for the scheduled sync, then refresh this page.
             </p>
         </div>
     @else
@@ -46,12 +54,16 @@
                         wire:model.live="selectedCalamity"
                         class="emap-select mt-1 w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-3 text-sm font-medium shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-white/10 dark:bg-gray-900 dark:focus:ring-blue-500/20"
                     >
-                        <option value="">All events</option>
+                        <option value="" @selected(blank($selectedCalamity))>All events</option>
                         @foreach ($calamities as $calamity)
-                            <option value="{{ $calamity['id'] }}">{{ $calamity['name'] }}</option>
+                            <option
+                                value="{{ $calamity['id'] }}"
+                                @selected((string) $selectedCalamity === (string) $calamity['id'])
+                            >{{ $calamity['name'] }}</option>
                         @endforeach
                     </select>
                     <p class="mt-1 text-xs text-gray-400">Risk is recomputed using the historical damage of the selected event (from Calamity Monitoring).</p>
+                    <p wire:loading wire:target="selectedCalamity" class="mt-1 text-xs font-medium text-blue-600 dark:text-blue-400">Refreshing risk data…</p>
                     @if ($this->selectedCalamityName())
                         <p class="mt-1 text-xs font-medium text-gray-600 dark:text-gray-300">Showing: {{ $this->selectedCalamityName() }}</p>
                     @endif
@@ -61,10 +73,20 @@
                     <p class="text-xs font-medium uppercase tracking-wide text-gray-400">How it's calculated</p>
                     <p class="mt-1 text-sm font-bold text-gray-900 dark:text-white">Economic Risk = Business Exposure × Historical Damage</p>
                     <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
-                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Exposure</span> — number of MSMEs in the area (local registry)</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Exposure</span> — number of MSMEs in the area (SCIMS registry)</li>
                         <li><span class="font-medium text-gray-700 dark:text-gray-300">Damage</span> — prior losses recorded in Calamity Monitoring</li>
                     </ul>
                     <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Areas with high MSME concentration and a history of losses score highest — pinpointing where a disaster would cause the greatest economic disruption.</p>
+                </div>
+
+                <div class="rounded-lg bg-white p-3 shadow-sm dark:bg-gray-900">
+                    <p class="text-xs font-medium uppercase tracking-wide text-gray-400">Reading the map</p>
+                    <ul class="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-500">
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Heat blur</span> — risk intensity: blue is least risk-prone, red is most risk-prone</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Barangay dot</span> — the barangay's exact risk band, from exposure × historical damage</li>
+                        <li><span class="font-medium text-gray-700 dark:text-gray-300">Blue pin</span> — an individual business; pins sharing the same saved coordinate are fanned out for visibility</li>
+                    </ul>
+                    <p class="mt-2 border-t border-gray-100 pt-2 text-xs text-gray-400 dark:border-white/10">Click a barangay dot for its risk breakdown, or a blue pin for the business's exact location.</p>
                 </div>
 
                 @include('filament.pages.economic-map.partials.summary-card')
@@ -74,13 +96,19 @@
             <div class="col-span-12 md:col-span-8 md:flex md:flex-col lg:col-span-9">
                 <div class="overflow-hidden rounded-lg shadow-sm md:flex md:min-h-0 md:flex-1 md:flex-col">
                     <div class="flex h-10 shrink-0 items-center gap-2 bg-[#1e2a78] px-4">
-                        <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🛡 Economic Risk Map — Linked to Calamity Monitoring</p>
+                        <p class="flex-1 truncate text-center text-xs font-bold uppercase tracking-wider text-white">🛡 Economic Risk Map — Risk Heat Layer</p>
                         <span class="shrink-0 rounded-full bg-white px-3 py-0.5 text-xs font-semibold text-[#1e2a78]">₱{{ number_format($totalDamage, 2) }} recorded</span>
                     </div>
                     <div class="relative md:min-h-0 md:flex-1">
                         <div id="risk-map" wire:ignore class="h-[60vh] w-full md:h-full"></div>
                         <div class="absolute bottom-10 right-3 rounded-lg bg-white/95 p-3 text-xs shadow-lg dark:bg-gray-900/95">
-                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk</p>
+                            <p class="mb-1.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Intensity</p>
+                            <div class="h-2 w-36 rounded-full" style="background: {{ $heatGradient }};"></div>
+                            <div class="mt-0.5 flex justify-between text-[10px] text-gray-400">
+                                <span>Least risk-prone</span>
+                                <span>Risk-prone</span>
+                            </div>
+                            <p class="mb-1.5 mt-2.5 font-bold uppercase tracking-wide text-gray-700 dark:text-gray-200">Risk Level</p>
                             @foreach (config('economic-map.risk_bands', []) as $band)
                                 <div class="flex items-center gap-2 py-0.5 text-gray-600 dark:text-gray-300">
                                     <span class="h-2.5 w-2.5 rounded-full" style="background: {{ $band['color'] }};"></span>
@@ -95,23 +123,81 @@
     @endif
 
     @include('filament.pages.economic-map.partials.info-bar', [
-        'slot' => 'Risk levels — Critical, High, Moderate, Low. Click a circle for the full risk breakdown.',
+        'slot' => 'Heat blur shows risk intensity — red areas are risk-prone, blue areas are least risk-prone. Barangay dot colour is the exact risk band. Blue pins mark every business with a set location from its exact saved coordinates, independent of the heat layer; pins sharing the same coordinate are fanned out and popups show the exact coordinates.',
     ])
 
     <script type="module">
         import * as maplibregl from '{{ asset('vendor/maplibre/maplibre-gl.mjs') }}';
 
-        const barangays = @js($barangays);
-        const bounds = @js($bounds);
+        let barangays = @js($barangays);
+        let allPins = @js($mapPins);
+        let bounds = @js($bounds);
         const basemap = @js(config('economic-map.basemap'));
+        const heatRamp = @js(config('economic-map.heat_ramp'));
         const el = document.getElementById('risk-map');
 
+        @include('filament.pages.economic-map.partials.pin-layer')
+
         const norm = (e) => e?.detail?.[0] ?? e?.detail ?? {};
+        const asList = (value) => {
+            if (Array.isArray(value)) return value;
+            if (value && typeof value === 'object') return Object.values(value);
+
+            return null;
+        };
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;',
+        }[char]));
+
+        @include('filament.pages.economic-map.partials.pin-popup')
+
         let map = null;
         let popup = null;
+        let pinPopup = null;
 
-        const radius = (score) => 9 + 12 * Math.sqrt(Math.max(score, 0));
         const money = (n) => '₱' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        // One point per barangay centroid, weighted by its normalized risk
+        // score, so the heat blur reads as risk intensity instead of raw
+        // MSME density. The 0.2 floor keeps least-risk barangays visibly
+        // blue rather than fading to nothing.
+        const heatFeatures = () => ({
+            type: 'FeatureCollection',
+            features: barangays.map((b) => ({
+                type: 'Feature',
+                properties: { weight: 0.2 + 0.8 * (b.score ?? 0) },
+                geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
+            })),
+        });
+
+        const centerFeatures = () => ({
+            type: 'FeatureCollection',
+            features: barangays.map((b) => ({
+                type: 'Feature',
+                properties: {
+                    barangay: b.barangay, score: b.score, color: b.color, level: b.level,
+                    count: b.business_count, exposure: b.exposure,
+                    affected: b.affected_count, damage: b.total_damage,
+                },
+                geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
+            })),
+        });
+
+        const pinFeatures = () => (allPins ?? []).map((p) => ({
+            type: 'Feature',
+            properties: {
+                name: p.name, entity_no: p.entity_no, street: p.street,
+                barangay: p.barangay, industry: p.industry, sector: p.sector,
+                color: p.color, lat: p.lat, lng: p.lng,
+                offset: Array.isArray(p.offset) ? p.offset : [0, 0],
+            },
+            // Exact stored coordinate — never the barangay average.
+            // The offset only moves the rendered icon, not this geometry.
+            geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
+        }));
+
+        const heatColor = ['interpolate', ['linear'], ['heatmap-density']];
+        for (const stop of [...heatRamp].sort((a, b) => a.stop - b.stop)) heatColor.push(stop.stop, stop.color);
 
         function boot() {
             if (! el || map) return;
@@ -140,33 +226,41 @@
                 map.addSource('osm', { type: 'raster', tiles: basemap.tiles, tileSize: basemap.tile_size, attribution: basemap.attribution, maxzoom: basemap.max_zoom });
                 map.addLayer({ id: 'osm', type: 'raster', source: 'osm' });
 
-                map.addSource('circles', {
-                    type: 'geojson',
-                    data: {
-                        type: 'FeatureCollection',
-                        features: barangays.map((b) => ({
-                            type: 'Feature',
-                            properties: {
-                                barangay: b.barangay, score: b.score, color: b.color, level: b.level,
-                                radius: radius(b.score), count: b.business_count,
-                                exposure: b.exposure, affected: b.affected_count, damage: b.total_damage,
-                            },
-                            geometry: { type: 'Point', coordinates: [b.lng, b.lat] },
-                        })),
+                map.addSource('heat', { type: 'geojson', data: heatFeatures() });
+                map.addLayer({
+                    id: 'heat', type: 'heatmap', source: 'heat', maxzoom: 17,
+                    paint: {
+                        // Points carry their barangay's risk score as weight, so
+                        // blob colour reads as risk intensity: blue = least
+                        // risk-prone, red = most. Exact bands stay on the dots.
+                        'heatmap-weight': ['get', 'weight'],
+                        'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 9, 18, 12, 30, 14, 46, 16, 64],
+                        'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 9, 0.5, 13, 0.9, 16, 1.4],
+                        'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 10, 0.95, 14, 0.55, 17, 0.25],
+                        'heatmap-color': heatColor,
                     },
                 });
+
+                map.addSource('centers', { type: 'geojson', data: centerFeatures() });
                 map.addLayer({
-                    id: 'circles', type: 'circle', source: 'circles',
+                    id: 'centers', type: 'circle', source: 'centers',
                     paint: {
-                        'circle-radius': ['get', 'radius'],
+                        'circle-radius': ['interpolate', ['linear'], ['zoom'], 10, 5.5, 14, 8.5],
                         'circle-color': ['get', 'color'],
-                        'circle-opacity': 0.65,
-                        'circle-stroke-width': 2,
+                        'circle-opacity': 0.95,
+                        'circle-stroke-width': 1.5,
                         'circle-stroke-color': '#ffffff',
                     },
                 });
 
-                map.on('click', 'circles', (e) => {
+                // Every exact set-location pin, visible on load above the
+                // aggregate barangay dots.
+                emapAddPinLayer(map, pinFeatures());
+
+                map.on('click', 'centers', (e) => {
+                    // Prefer the exact business pin when it overlaps a dot.
+                    if (map.queryRenderedFeatures(e.point, { layers: ['pins'] }).length > 0) return;
+
                     const p = e.features?.[0]?.properties;
                     if (! p) return;
 
@@ -186,8 +280,19 @@
 
                     if (window.Livewire) window.Livewire.dispatch('emap-select-barangay', { barangay: p.barangay });
                 });
-                map.on('mouseenter', 'circles', () => (map.getCanvas().style.cursor = 'pointer'));
-                map.on('mouseleave', 'circles', () => (map.getCanvas().style.cursor = ''));
+                map.on('mouseenter', 'centers', () => (map.getCanvas().style.cursor = 'pointer'));
+                map.on('mouseleave', 'centers', () => (map.getCanvas().style.cursor = ''));
+
+                map.on('click', 'pins', (e) => {
+                    const p = e.features?.[0]?.properties;
+                    if (! p) return;
+
+                    if (! pinPopup) pinPopup = new maplibregl.Popup({ closeButton: true, maxWidth: '300px' });
+
+                    pinPopup.setLngLat([Number(p.lng), Number(p.lat)]).setHTML(emapPinPopupHtml(p, true)).addTo(map);
+                });
+                map.on('mouseenter', 'pins', () => (map.getCanvas().style.cursor = 'pointer'));
+                map.on('mouseleave', 'pins', () => (map.getCanvas().style.cursor = ''));
 
                 if (bounds) map.fitBounds([[bounds[1], bounds[0]], [bounds[3], bounds[2]]], { padding: 40 });
             });
@@ -204,7 +309,31 @@
             if (map && d.lat && d.lng) map.flyTo({ center: [d.lng, d.lat], zoom: 16 });
         });
 
-        window.addEventListener('emap-data-refreshed', () => window.location.reload());
+        window.addEventListener('emap-risk-updated', (e) => {
+            const d = norm(e);
+            const nextBarangays = asList(d.barangays);
+            const nextPins = asList(d.pins);
+            const nextBounds = asList(d.bounds);
+
+            if (nextBarangays) barangays = nextBarangays;
+            if (nextBounds?.length === 4) bounds = nextBounds;
+
+            if (! map) return;
+
+            // Refresh the risk layers and pins in place. Reloading the page
+            // would reset the Calamity Event select to "All events".
+            map.getSource('heat')?.setData(heatFeatures());
+            map.getSource('centers')?.setData(centerFeatures());
+
+            if (nextPins) {
+                allPins = nextPins;
+
+                if (map.getSource('pins')) emapRenderPins(map, pinFeatures());
+            }
+
+            popup?.remove();
+            pinPopup?.remove();
+        });
         document.addEventListener('livewire:navigated', () => boot());
 
         let resizeTimer;

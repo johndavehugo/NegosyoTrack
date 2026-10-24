@@ -51,6 +51,15 @@ class RiskMap extends BaseMapPage
     protected function loadData(): void
     {
         $service = app(EconomicMapService::class);
+
+        $this->loadRiskData($service);
+        $this->bounds = $service->pinBounds();
+        $this->loadMapPins($service);
+        $this->loadUnsetCount();
+    }
+
+    protected function loadRiskData(EconomicMapService $service): void
+    {
         $risk = $service->risk(filled($this->selectedCalamity) ? (int) $this->selectedCalamity : null);
 
         $this->barangays = $risk['barangays'];
@@ -59,15 +68,40 @@ class RiskMap extends BaseMapPage
         $this->totalDamage = $risk['total_damage'];
         $this->totalAffected = $risk['total_affected'];
         $this->calamities = $risk['calamities'];
-        $this->bounds = $service->bounds();
         $this->hasData = $this->assessed > 0;
-        $this->loadUnsetCount();
     }
 
+    /**
+     * Recompute the risk layer without reloading the page, so the selected
+     * calamity stays visible while the map sources are refreshed.
+     */
     public function updatedSelectedCalamity(): void
     {
-        $this->loadData();
-        $this->dispatch('emap-data-refreshed');
+        $service = app(EconomicMapService::class);
+        $previousPins = $this->mapPins;
+        $previousBounds = $this->bounds;
+
+        $this->loadRiskData($service);
+        $this->bounds = $service->pinBounds();
+        $this->loadMapPins($service);
+
+        $payload = [
+            'calamity_id' => filled($this->selectedCalamity) ? (int) $this->selectedCalamity : null,
+            'barangays' => $this->barangays,
+        ];
+
+        // Pins and bounds normally do not depend on the calamity, so only
+        // send them when they actually changed. This keeps the event small
+        // while still refreshing the pin layer after a data sync.
+        if ($this->mapPins !== $previousPins) {
+            $payload['pins'] = $this->mapPins;
+        }
+
+        if ($this->bounds !== $previousBounds) {
+            $payload['bounds'] = $this->bounds;
+        }
+
+        $this->dispatch('emap-risk-updated', $payload);
     }
 
     public function selectedCalamityName(): ?string

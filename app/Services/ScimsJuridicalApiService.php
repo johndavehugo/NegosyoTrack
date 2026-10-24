@@ -23,7 +23,7 @@ class ScimsJuridicalApiService
 
     protected bool $usedStaleCache = false;
 
-    public function getBusiness(int $page, int $recordsPerPage, $search, ?string $sortColumn, ?string $sortDirection)
+    public function getBusiness(?int $page, ?int $recordsPerPage, ?string $search, ?string $sortColumn, ?string $sortDirection)
     {
         $response = Http::baseUrl(config('scims.base_url'))
             ->get('juridical?include=employees.information,organization,address,owner.information,employer&expand=details', [

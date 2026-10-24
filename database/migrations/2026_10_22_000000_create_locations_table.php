@@ -11,6 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // locations existed as a hand-made table on early installs.
+        if (Schema::hasTable('locations')) {
+            return;
+        }
+
         Schema::create('locations', function (Blueprint $table) {
             $table->charset = 'utf8mb4';
             $table->collation = 'utf8mb4_unicode_ci';
