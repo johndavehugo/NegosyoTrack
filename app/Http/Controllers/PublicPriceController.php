@@ -172,14 +172,15 @@ class PublicPriceController extends Controller
             'categories' => Category::count(),
         ];
 
-        return view('sccpresyo.layout')->with('slot',
-            view('sccpresyo.price-list', compact(
+        return view('sccpresyo.layout')->with([
+            'slot' => view('sccpresyo.price-list', compact(
                 'groups',
                 'categories',
                 'agencies',
                 'totals',
-            ))
-        );
+            )),
+            'categories' => $categories,
+        ]);
     }
 
     /**

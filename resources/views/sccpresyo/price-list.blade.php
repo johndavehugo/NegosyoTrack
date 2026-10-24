@@ -38,9 +38,9 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex items-center gap-3 h-16">
 
-            {{-- Hamburger menu button --}}
+            {{-- Hamburger menu button — desktop only (mobile uses bottom navbar) --}}
             <button id="sidebar-toggle-btn"
-                class="shrink-0 p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-800"
+                class="hidden md:flex shrink-0 p-2 rounded-xl hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-800"
                 aria-label="Open menu" title="Menu">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
@@ -71,15 +71,15 @@
     </div>
 </header>
 
-{{-- ══ SIDEBAR ══════════════════════════════════════════════════════ --}}
+{{-- ══ SIDEBAR — desktop only (md+) ════════════════════════════════ --}}
 {{-- Overlay --}}
 <div id="sidebar-overlay"
-     class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-250">
+     class="hidden md:block fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-40 opacity-0 pointer-events-none transition-opacity duration-250">
 </div>
 
-{{-- Sidebar panel (slides in from left) --}}
+{{-- Sidebar panel (slides in from left) — desktop only --}}
 <aside id="sidebar-panel"
-       class="fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-2xl flex flex-col
+       class="hidden md:flex fixed top-0 left-0 h-full w-72 bg-white z-50 shadow-2xl flex-col
               -translate-x-full transition-transform duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
        role="dialog" aria-label="Navigation menu">
 
@@ -259,32 +259,32 @@
 
 {{-- ══ HERO & FILTERS ════════════════════════════════════════════════ --}}
 <div class="bg-white border-b border-slate-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
 
         {{-- Title row --}}
-        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-5 mb-6">
+        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-5 mb-3 sm:mb-6">
             <div>
-                <h1 class="text-2xl sm:text-3xl font-black text-slate-900 leading-tight tracking-tight">
+                <h1 class="text-xl sm:text-3xl font-black text-slate-900 leading-tight tracking-tight">
                     San Carlos City <span class="text-brand">e-Presyo</span>
                 </h1>
-                <p class="mt-1.5 text-sm text-slate-500 max-w-xl leading-relaxed">
-                    Official Suggested Retail Price (SRP) and prevailing prices of basic commodities
-                    in San Carlos City. Click any product to compare prices across establishments.
+                <p class="mt-1 sm:mt-1.5 text-xs sm:text-sm text-slate-500 max-w-xl leading-relaxed">
+                    Official SRP and prevailing prices of basic commodities in San Carlos City.
+                    <span class="hidden sm:inline">Click any product to compare prices across establishments.</span>
                 </p>
             </div>
 
-            {{-- Stats --}}
-            <div class="flex items-center gap-2.5 shrink-0 flex-wrap">
-                <div class="text-center px-4 py-3 rounded-2xl bg-slate-50 border border-slate-200/80 min-w-[80px]">
-                    <p class="text-2xl font-black text-slate-900 font-mono">{{ number_format($totals['commodities']) }}</p>
+            {{-- Stats — horizontal scroll on mobile, wrap on sm+ --}}
+            <div class="flex items-center gap-2 sm:gap-2.5 shrink-0 overflow-x-auto pb-0.5 sm:pb-0 sm:flex-wrap -mx-4 px-4 sm:mx-0 sm:px-0">
+                <div class="text-center px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200/80 min-w-[72px] sm:min-w-[80px] shrink-0">
+                    <p class="text-xl sm:text-2xl font-black text-slate-900 font-mono">{{ number_format($totals['commodities']) }}</p>
                     <p class="text-[10px] text-slate-500 uppercase tracking-wider mt-0.5 font-semibold">Monitored</p>
                 </div>
-                <div class="text-center px-4 py-3 rounded-2xl bg-brand/10 border border-brand/20 min-w-[80px]">
-                    <p class="text-2xl font-black text-brand font-mono">{{ number_format($totals['categories']) }}</p>
+                <div class="text-center px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-brand/10 border border-brand/20 min-w-[72px] sm:min-w-[80px] shrink-0">
+                    <p class="text-xl sm:text-2xl font-black text-brand font-mono">{{ number_format($totals['categories']) }}</p>
                     <p class="text-[10px] text-brand/60 uppercase tracking-wider mt-0.5 font-semibold">Categories</p>
                 </div>
-                <div class="text-center px-4 py-3 rounded-2xl bg-amber-50 border border-amber-200/80 min-w-[80px]">
-                    <p class="text-2xl font-black text-amber-600 font-mono">{{ number_format($totals['agencies']) }}</p>
+                <div class="text-center px-3 py-2.5 sm:px-4 sm:py-3 rounded-xl sm:rounded-2xl bg-amber-50 border border-amber-200/80 min-w-[72px] sm:min-w-[80px] shrink-0">
+                    <p class="text-xl sm:text-2xl font-black text-amber-600 font-mono">{{ number_format($totals['agencies']) }}</p>
                     <p class="text-[10px] text-amber-500 uppercase tracking-wider mt-0.5 font-semibold">Agencies</p>
                 </div>
             </div>
@@ -292,8 +292,9 @@
 
         {{-- Filter form --}}
         <form method="GET" action="{{ route('sccpresyo.index') }}" id="filter-form">
-            {{-- Search row --}}
-            <div class="relative mb-4">
+
+            {{-- Desktop search row — hidden on mobile (use bottom nav Search instead) --}}
+            <div class="relative mb-4 hidden sm:block">
                 <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -305,7 +306,6 @@
                        class="w-full pl-9 pr-9 py-2.5 text-sm rounded-xl border border-slate-200 bg-white
                               focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
                               placeholder-slate-400 shadow-sm"/>
-                {{-- Clear button — shown only when there is text --}}
                 <button id="search-clear-btn" type="button"
                     class="{{ filled($search) ? 'flex' : 'hidden' }} absolute right-3 top-1/2 -translate-y-1/2
                            items-center justify-center w-5 h-5 rounded-full bg-slate-200 hover:bg-slate-300
@@ -317,11 +317,86 @@
                 </button>
             </div>
 
-            {{-- Tabs + dropdowns row --}}
-            <div class="flex flex-wrap items-center gap-2">
+            {{-- Mobile: active search indicator (shown when a search is active) --}}
+            @if(filled($search))
+            <div class="flex items-center gap-2 mb-3 sm:hidden">
+                <svg class="w-3.5 h-3.5 text-brand shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+                </svg>
+                <span class="text-xs font-semibold text-slate-700 truncate">Searching: "{{ $search }}"</span>
+                <a href="{{ route('sccpresyo.index', array_filter(['category' => $categoryId ?: null, 'sort' => $sort !== 'name_asc' ? $sort : null])) }}"
+                   class="ml-auto shrink-0 text-xs font-bold text-rose-500 hover:text-rose-700 transition-colors"
+                   style="text-decoration:none">✕ Clear</a>
+            </div>
+            @endif
+
+            {{-- ── Filter controls row ── --}}
+
+            {{-- MOBILE layout: two rows --}}
+            <div class="sm:hidden space-y-2">
+
+                {{-- Row 1: All Commodities pill (full width) + result count --}}
+                <div class="flex items-center gap-2">
+                    <button id="tab-all" type="button"
+                        class="tab-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
+                               transition-all duration-200 bg-brand text-white shadow-sm shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                        All Commodities
+                    </button>
+
+                    {{-- Result count pill pushed to right --}}
+                    <div class="ml-auto flex items-center gap-1.5 border border-slate-200 rounded-full px-3 py-1.5 bg-slate-50 shrink-0">
+                        <span class="text-xs font-bold text-slate-700">{{ number_format($groups->total()) }}</span>
+                        <span class="text-xs text-slate-400">{{ Str::plural('item', $groups->total()) }}</span>
+                    </div>
+                </div>
+
+                {{-- Row 2: Category + Sort dropdowns side by side --}}
+                <div class="flex items-center gap-2">
+                    <select name="category" onchange="this.form.submit()"
+                        class="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
+                               shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+                               appearance-none cursor-pointer font-medium">
+                        <option value="">All Categories</option>
+                        @foreach ($categories as $cat)
+                            <option value="{{ $cat->id }}" @selected($categoryId == $cat->id)>
+                                {{ $cat->name }} ({{ $cat->commodities_count }})
+                            </option>
+                        @endforeach
+                    </select>
+
+                    <select name="sort" onchange="this.form.submit()"
+                        class="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
+                               shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
+                               appearance-none cursor-pointer font-medium">
+                        <option value="name_asc"  @selected($sort === 'name_asc') >Name A → Z</option>
+                        <option value="name_desc" @selected($sort === 'name_desc')>Name Z → A</option>
+                        <option value="srp_asc"   @selected($sort === 'srp_asc')  >Price: Low → High</option>
+                        <option value="srp_desc"  @selected($sort === 'srp_desc') >Price: High → Low</option>
+                        <option value="cat_asc"   @selected($sort === 'cat_asc')  >By Category</option>
+                    </select>
+
+                    @if (filled($categoryId) || filled($agencyId))
+                        <a href="{{ route('sccpresyo.index', array_filter(['search' => $search ?: null, 'sort' => $sort !== 'name_asc' ? $sort : null])) }}"
+                            class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200
+                                   text-slate-400 hover:text-rose-500 hover:border-rose-200 transition-all bg-white shadow-sm"
+                            title="Clear filters"
+                            style="text-decoration:none">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </a>
+                    @endif
+                </div>
+            </div>
+
+            {{-- DESKTOP layout: original single-row flex (unchanged) --}}
+            <div class="hidden sm:flex flex-wrap items-center gap-2">
 
                 {{-- All Commodities tab --}}
-                <button id="tab-all" type="button"
+                <button id="tab-all-desktop" type="button"
                     class="tab-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
                            transition-all duration-200 bg-brand text-white shadow-sm shrink-0">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -332,7 +407,6 @@
 
                 <div class="w-px h-6 bg-slate-200 shrink-0"></div>
 
-                {{-- Category dropdown --}}
                 <select name="category" onchange="this.form.submit()"
                     class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
                            shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
@@ -345,7 +419,6 @@
                     @endforeach
                 </select>
 
-                {{-- Sort dropdown --}}
                 <select name="sort" onchange="this.form.submit()"
                     class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
                            shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
@@ -387,7 +460,7 @@
 </div>
 
 {{-- ══ CARDS GRID ════════════════════════════════════════════════════ --}}
-<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-28 md:pb-8">
 
     @if ($groups->isEmpty())
         <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm py-24 text-center">
@@ -672,7 +745,7 @@
 </main>
 
 {{-- ══ FOOTER ════════════════════════════════════════════════════════ --}}
-<footer class="bg-brand border-t-4 border-brand-dark mt-8">
+<footer class="bg-brand border-t-4 border-brand-dark mt-8 pb-24 md:pb-0">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-wrap items-center justify-between gap-4">
         <div>
             <p class="text-white font-black text-sm">SCCPresyo · San Carlos City</p>
@@ -692,7 +765,8 @@
 
 {{-- ══ DETAIL MODAL ══════════════════════════════════════════════════ --}}
 <div id="detail-overlay"
-     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4 sm:p-6">
+     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 sm:p-6"
+     style="z-index:9500">
     <div id="detail-modal"
          class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -829,7 +903,8 @@
 
 {{-- ══ FAVORITES MODAL ══════════════════════════════════════════════ --}}
 <div id="favorites-overlay"
-     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4 sm:p-6">
+     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 sm:p-6"
+     style="z-index:9500">
     <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true" aria-labelledby="favorites-modal-title">
 
@@ -1052,7 +1127,9 @@
     // ── DOM refs ───────────────────────────────────────────────────
     const cardsGrid      = document.getElementById('cards-grid');
     const allCards       = cardsGrid ? Array.from(cardsGrid.querySelectorAll('.price-card')) : [];
+    // tab-all = mobile, tab-all-desktop = desktop — both control the same filter
     const tabAll         = document.getElementById('tab-all');
+    const tabAllDesktop  = document.getElementById('tab-all-desktop');
     const tabWatchlist   = document.getElementById('tab-watchlist');
     const watchlistBtn   = document.getElementById('watchlist-toggle-btn');
     const countBadge     = document.getElementById('watchlist-count');
@@ -1526,11 +1603,11 @@
     function setActiveTab(tab) {
         activeTab = tab;
         const isAll = tab === 'all';
-        // Active: bg-brand text-white shadow-sm
-        // Inactive: border border-slate-200 text-slate-600 bg-white
-        [tabAll, tabWatchlist].forEach((btn, i) => {
+        // Sync both the mobile and desktop "All Commodities" buttons + the watchlist tab
+        [tabAll, tabAllDesktop, tabWatchlist].forEach((btn, i) => {
             if (!btn) return;
-            const active = (i === 0 && isAll) || (i === 1 && !isAll);
+            // i=0 → mobile All, i=1 → desktop All, i=2 → watchlist
+            const active = (i <= 1 && isAll) || (i === 2 && !isAll);
             btn.className = btn.className
                 .replace(/bg-brand\s*|text-white\s*|shadow-sm\s*|border\s+border-slate-200\s*|text-slate-600\s*|bg-white\s*/g, '')
                 .trim();
@@ -1546,6 +1623,7 @@
     }
 
     tabAll?.addEventListener('click', () => setActiveTab('all'));
+    tabAllDesktop?.addEventListener('click', () => setActiveTab('all'));
     tabWatchlist?.addEventListener('click', () => setActiveTab('watchlist'));
 
     // main-search — debounced auto-submit on typing
@@ -1601,6 +1679,8 @@
         favOverlay.classList.add('flex');
         document.body.style.overflow = 'hidden';
     }
+    // Expose globally so the mobile bottom navbar can call it
+    window.openFavoritesModal = openFavoritesModal;
 
     function closeFavoritesModal() {
         favOverlay.classList.add('hidden');
