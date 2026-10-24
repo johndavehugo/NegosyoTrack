@@ -31,6 +31,8 @@ class TrainingProgramResource extends Resource
 
     protected static ?string $modelLabel = 'Training Record';
 
+    protected static ?int $navigationSort = 1;
+
     protected static ?string $recordTitleAttribute = 'training_program';
 
     public static function getNavigationGroup(): ?string
