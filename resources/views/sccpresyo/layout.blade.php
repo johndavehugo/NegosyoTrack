@@ -121,7 +121,7 @@
             line-height: 1;
         }
 
-        /* Active indicator pill — REMOVED for clean look */
+        /* Sliding active indicator (markup: #mob-nav-indicator) */
 
         /* Filled heart when favorites is active */
         #mob-nav-favorites.active .nav-icon { fill: #186b02; stroke: #186b02; }
@@ -205,6 +205,113 @@
         .search-pill:nth-child(4) { animation-delay: 0.16s; }
         .search-pill:nth-child(5) { animation-delay: 0.20s; }
         .search-pill:nth-child(6) { animation-delay: 0.24s; }
+
+        /* ─── Mobile nav active indicator ────────────────────────── */
+        #mob-nav-indicator {
+            position: absolute;
+            top: 6px;
+            bottom: 6px;
+            left: 6px;
+            width: calc((100% - 12px) / 3);
+            border-radius: 16px;
+            background: rgba(24, 107, 2, 0.09);
+            pointer-events: none;
+            z-index: 0;
+            transition: transform 0.32s cubic-bezier(.34,1.56,.64,1);
+        }
+        .mob-nav-btn { z-index: 1; }
+
+        /* Favorites badge pop */
+        @keyframes mob-badge-pop {
+            0%   { transform: scale(0.6); }
+            55%  { transform: scale(1.18); }
+            100% { transform: scale(1); }
+        }
+        #mob-nav-fav-badge.pop {
+            animation: mob-badge-pop 0.32s cubic-bezier(.34,1.56,.64,1);
+        }
+
+        /* Keep the search sheet usable on short screens / with keyboard open */
+        #mob-search-sheet {
+            max-height: 92vh;
+            max-height: 92dvh;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ─── Bottom-sheet modals ────────────────────────────────── */
+        .sheet-overlay {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.22s ease;
+        }
+        .sheet-overlay.modal-open {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        @media (max-width: 767px) {
+            .sheet-overlay {
+                align-items: flex-end;
+                padding: 0;
+            }
+            .sheet-overlay .sheet-panel {
+                border-radius: 1.5rem 1.5rem 0 0;
+                max-height: 92vh;
+                max-height: 92dvh;
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+                transform: translateY(100%);
+                transition: transform 0.32s cubic-bezier(.32,.72,0,1);
+            }
+            .sheet-overlay.modal-open .sheet-panel {
+                transform: translateY(0);
+            }
+        }
+
+        /* ─── Card entrance stagger (mobile) ─────────────────────── */
+        @media (max-width: 767px) and (prefers-reduced-motion: no-preference) {
+            @keyframes mobile-card-in {
+                from { opacity: 0; transform: translateY(12px); }
+                to   { opacity: 1; transform: translateY(0); }
+            }
+            .price-card {
+                animation: mobile-card-in 0.34s cubic-bezier(.22,1,.36,1) backwards;
+            }
+            .price-card:nth-child(1) { animation-delay: 0.02s; }
+            .price-card:nth-child(2) { animation-delay: 0.06s; }
+            .price-card:nth-child(3) { animation-delay: 0.10s; }
+            .price-card:nth-child(4) { animation-delay: 0.14s; }
+            .price-card:nth-child(5) { animation-delay: 0.18s; }
+            .price-card:nth-child(6) { animation-delay: 0.22s; }
+            .price-card:nth-child(7) { animation-delay: 0.26s; }
+            .price-card:nth-child(8) { animation-delay: 0.30s; }
+            .price-card:nth-child(9) { animation-delay: 0.34s; }
+            .price-card:nth-child(n+10) { animation-delay: 0.34s; }
+        }
+
+        /* ─── Reduced motion ─────────────────────────────────────── */
+        @media (prefers-reduced-motion: reduce) {
+            #mob-nav-indicator,
+            .mob-nav-btn,
+            .mob-nav-btn .nav-icon,
+            #mob-nav-fav-badge,
+            #mob-search-sheet,
+            #mob-search-sheet-overlay,
+            .sheet-overlay,
+            .sheet-panel,
+            .price-card,
+            .search-pill,
+            .live-dot,
+            .ticker-track,
+            #watchlist-drawer,
+            #drawer-overlay,
+            #sidebar-panel,
+            #sidebar-overlay {
+                transition: none !important;
+                animation: none !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 antialiased">
@@ -260,13 +367,16 @@
          class="md:hidden fixed bottom-0 left-0 right-0 border-t border-slate-200/70 shadow-[0_-1px_20px_rgba(0,0,0,0.06)]"
          style="z-index:9000"
          role="navigation" aria-label="Mobile navigation">
-        <div class="flex items-stretch">
+        <div class="relative flex items-stretch">
+            <span id="mob-nav-indicator" aria-hidden="true"
+                  style="transform: translateX({{ filled(request('search')) ? '100%' : '0%' }})"></span>
 
             {{-- Home --}}
             <a id="mob-nav-home"
                href="{{ route('sccpresyo.index') }}"
-               class="mob-nav-btn active"
+               class="mob-nav-btn {{ filled(request('search')) ? '' : 'active' }}"
                style="text-decoration:none; display:flex; flex:1;"
+               @if (! filled(request('search'))) aria-current="page" @endif
                aria-label="Home">
                 {{-- Modern grid/compass home icon --}}
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -278,8 +388,11 @@
 
             {{-- Search --}}
             <button id="mob-nav-search"
-                    class="mob-nav-btn"
+                    class="mob-nav-btn {{ filled(request('search')) ? 'active' : '' }}"
                     aria-label="Search commodities"
+                    aria-controls="mob-search-sheet"
+                    aria-expanded="false"
+                    @if (filled(request('search'))) aria-current="page" @endif
                     type="button"
                     style="flex:1;">
                 <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -336,6 +449,9 @@
                 @if(request()->filled('sort') && request('sort') !== 'name_asc')
                     <input type="hidden" name="sort" value="{{ request('sort') }}">
                 @endif
+                @if(request()->filled('agency'))
+                    <input type="hidden" name="agency" value="{{ request('agency') }}">
+                @endif
 
                 <div class="relative">
                     <svg class="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none"
@@ -365,6 +481,12 @@
                         </svg>
                     </button>
                 </div>
+
+                <button type="submit"
+                        class="mt-3 w-full py-3 rounded-2xl bg-[#186b02] text-white text-sm font-black
+                               shadow-sm transition-transform duration-150 active:scale-[0.98]">
+                    Search commodities
+                </button>
             </form>
 
             {{-- Category quick-filter pills --}}
@@ -404,6 +526,7 @@
             var navHome      = document.getElementById('mob-nav-home');
             var navSearch    = document.getElementById('mob-nav-search');
             var navFavorites = document.getElementById('mob-nav-favorites');
+            var navIndicator = document.getElementById('mob-nav-indicator');
             var navFavBadge  = document.getElementById('mob-nav-fav-badge');
             var sheetOverlay = document.getElementById('mob-search-sheet-overlay');
             var sheet        = document.getElementById('mob-search-sheet');
@@ -412,42 +535,86 @@
             var sheetClear   = document.getElementById('mob-search-clear');
             var sheetForm    = document.getElementById('mob-search-form');
 
-            // ── Active state ─────────────────────────────────────
-            function setActive(btn) {
-                [navHome, navSearch, navFavorites].forEach(function(b) {
-                    if (b) b.classList.remove('active');
-                });
-                if (btn) btn.classList.add('active');
+            var navItems = [navHome, navSearch, navFavorites];
+            var searchQueryActive = {{ json_encode(filled(request('search'))) }};
+            var homePath = '{{ parse_url(route('sccpresyo.index'), PHP_URL_PATH) }}';
+
+            function baseTab() {
+                return searchQueryActive ? 'search' : 'home';
             }
 
-            // ── Favorites badge ──────────────────────────────────
-            function syncBadge() {
+            function tabIndex(name) {
+                return name === 'search' ? 1 : (name === 'favorites' ? 2 : 0);
+            }
+
+            // ── Active state + sliding indicator ──────────────────
+            function setActiveTab(name) {
+                var index = tabIndex(name);
+
+                navItems.forEach(function(btn, i) {
+                    if (!btn) return;
+                    var active = i === index;
+                    btn.classList.toggle('active', active);
+                    if (active) {
+                        btn.setAttribute('aria-current', 'page');
+                    } else {
+                        btn.removeAttribute('aria-current');
+                    }
+                });
+
+                if (navIndicator) {
+                    navIndicator.style.transform = 'translateX(' + (index * 100) + '%)';
+                }
+            }
+
+            // ── Favorites badge — event-driven, no polling ────────
+            function syncBadge(animate) {
                 if (!navFavBadge) return;
                 try {
                     var list = JSON.parse(localStorage.getItem('scc_watchlist_v3') || '[]');
                     var n = list.length;
-                    navFavBadge.textContent = n > 99 ? '99+' : String(n);
-                    if (n > 0) { navFavBadge.classList.add('visible'); }
-                    else       { navFavBadge.classList.remove('visible'); }
-                } catch(e) {}
-            }
-            syncBadge();
-            window.addEventListener('storage', syncBadge);
-            setInterval(syncBadge, 800);
+                    var text = n > 99 ? '99+' : String(n);
+                    var changed = navFavBadge.dataset.ready === '1' && navFavBadge.textContent !== text;
 
-            // ── Search sheet ─────────────────────────────────────
+                    navFavBadge.textContent = text;
+                    navFavBadge.classList.toggle('visible', n > 0);
+
+                    if (changed && animate) {
+                        navFavBadge.classList.remove('pop');
+                        void navFavBadge.offsetWidth;
+                        navFavBadge.classList.add('pop');
+                    }
+
+                    navFavBadge.dataset.ready = '1';
+                } catch (e) {}
+            }
+            syncBadge(false);
+            window.addEventListener('storage', function() { syncBadge(true); });
+            window.addEventListener('scc:watchlist-changed', function() { syncBadge(true); });
+
+            // ── Search sheet ──────────────────────────────────────
             function openSheet() {
+                if (typeof window.closeFavoritesModal === 'function') {
+                    window.closeFavoritesModal();
+                }
+
                 if (sheet)        sheet.classList.add('open');
                 if (sheetOverlay) sheetOverlay.classList.add('open');
                 document.body.style.overflow = 'hidden';
-                setTimeout(function(){ if (sheetInput) sheetInput.focus(); }, 300);
-                setActive(navSearch);
+                setActiveTab('search');
+                if (navSearch) navSearch.setAttribute('aria-expanded', 'true');
+                setTimeout(function() {
+                    if (sheet && sheet.classList.contains('open') && sheetInput) sheetInput.focus();
+                }, 300);
             }
+
             function closeSheet() {
                 if (sheet)        sheet.classList.remove('open');
                 if (sheetOverlay) sheetOverlay.classList.remove('open');
+                if (sheetInput && document.activeElement === sheetInput) sheetInput.blur();
                 document.body.style.overflow = '';
-                setActive(navHome);
+                setActiveTab(baseTab());
+                if (navSearch) navSearch.setAttribute('aria-expanded', 'false');
             }
 
             if (navSearch) {
@@ -457,8 +624,9 @@
                     else openSheet();
                 });
             }
-            if (sheetClose)   sheetClose.addEventListener('click',   function(){ closeSheet(); });
-            if (sheetOverlay) sheetOverlay.addEventListener('click', function(e){ if (e.target === sheetOverlay) closeSheet(); });
+
+            if (sheetClose)   sheetClose.addEventListener('click', function() { closeSheet(); });
+            if (sheetOverlay) sheetOverlay.addEventListener('click', function(e) { if (e.target === sheetOverlay) closeSheet(); });
 
             if (sheetInput) {
                 sheetInput.addEventListener('input', function() {
@@ -479,42 +647,58 @@
                 });
             }
 
-            // ── Favorites ────────────────────────────────────────
+            // ── Favorites ─────────────────────────────────────────
             if (navFavorites) {
                 navFavorites.addEventListener('click', function(e) {
                     e.preventDefault();
-                    setActive(navFavorites);
+                    closeSheet();
+                    setActiveTab('favorites');
 
                     if (typeof window.openFavoritesModal === 'function') {
                         window.openFavoritesModal();
                     } else {
                         var ov = document.getElementById('favorites-overlay');
                         if (ov) {
-                            ov.style.display = 'flex';
+                            ov.classList.remove('hidden');
+                            ov.classList.add('flex', 'modal-open');
                             document.body.style.overflow = 'hidden';
                         }
                     }
-
-                    // Reset back to Home when modal closes
-                    var closeBtn = document.getElementById('favorites-modal-close');
-                    var ov2      = document.getElementById('favorites-overlay');
-                    if (closeBtn) closeBtn.addEventListener('click', function(){ setActive(navHome); }, { once: true });
-                    if (ov2)      ov2.addEventListener('click', function handler(e){
-                        if (e.target === ov2) { setActive(navHome); ov2.removeEventListener('click', handler); }
-                    });
                 });
             }
 
-            // ── Home ─────────────────────────────────────────────
-            if (navHome) navHome.addEventListener('click', function(){ setActive(navHome); });
+            // The favorites modal dispatches this from any close path
+            // (button, backdrop, Escape) so the tab state stays correct.
+            window.addEventListener('scc:favorites-closed', function() {
+                setActiveTab(baseTab());
+            });
 
-            // ── Escape ───────────────────────────────────────────
-            document.addEventListener('keydown', function(e){
+            // ── Home ──────────────────────────────────────────────
+            if (navHome) {
+                navHome.addEventListener('click', function(e) {
+                    closeSheet();
+                    if (typeof window.closeFavoritesModal === 'function') {
+                        window.closeFavoritesModal();
+                    }
+                    setActiveTab('home');
+
+                    var onHome = window.location.pathname.replace(/\/+$/, '') === homePath.replace(/\/+$/, '');
+                    if (onHome && window.location.search === '') {
+                        e.preventDefault();
+                        var reduceMotion = window.matchMedia
+                            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+                        window.scrollTo({ top: 0, behavior: reduceMotion ? 'auto' : 'smooth' });
+                    }
+                });
+            }
+
+            // ── Escape ────────────────────────────────────────────
+            document.addEventListener('keydown', function(e) {
                 if (e.key === 'Escape') closeSheet();
             });
 
-            // Mark Search active if page loaded with a search query
-            if ({{ json_encode(!empty(request('search'))) }}) setActive(navSearch);
+            // Restore the correct tab on load (search results keep Search active)
+            setActiveTab(baseTab());
         }
 
         // Run now if DOM ready, otherwise wait

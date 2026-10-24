@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 /**
@@ -20,8 +22,8 @@ class PriceMonitoringService
             $response = Http::timeout(8)
                 ->baseUrl('http://cictd.app/api/scims')
                 ->get('juridical', [
-                    'per_page'       => 200,
-                    'page'           => 1,
+                    'per_page' => 200,
+                    'page' => 1,
                     'filter[search]' => $search,
                 ]);
 
@@ -34,7 +36,7 @@ class PriceMonitoringService
                     $item['entity_no'] => $item['juri_name'],
                 ])
                 ->all();
-        } catch (\Illuminate\Http\Client\ConnectionException) {
+        } catch (ConnectionException) {
             return [];
         }
     }
@@ -65,33 +67,79 @@ class PriceMonitoringService
     }
 
     /**
-     * Resolve a stored entity_no back to a display name.
-     * Cached for 5 minutes to avoid repeated API calls.
+     * Resolve an establishment's display name and location.
+     *
+     * SCIMS only returns address fields when include=address is requested.
+     * Name-only callers share this cache through resolveEstablishmentName().
+     *
+     * @return array{name: string, address: ?string}|null
      */
-    public function resolveEstablishmentName(?string $entityNo): ?string
+    public function resolveEstablishment(?string $entityNo): ?array
     {
         if (blank($entityNo)) {
             return null;
         }
 
-        $cacheKey = 'scims_est_' . $entityNo;
+        $cacheKey = 'scims_est_details_v2_'.$entityNo;
 
-        return \Illuminate\Support\Facades\Cache::remember($cacheKey, 300, function () use ($entityNo) {
+        return Cache::remember($cacheKey, 900, function () use ($entityNo) {
             try {
                 // Use the full URL directly — Http::baseUrl() drops the last path
                 // segment when ->get() is called with a relative path, so we build
                 // the complete URL ourselves to avoid that pitfall.
                 $data = Http::timeout(5)
                     ->get("http://cictd.app/api/scims/juridical/{$entityNo}", [
-                        'include' => '',
-                        'expand'  => 'details',
+                        'include' => 'address',
+                        'expand' => 'details',
                     ])
                     ->json('data');
 
-                return $data['juri_name'] ?? null;
-            } catch (\Illuminate\Http\Client\ConnectionException) {
+                if (! is_array($data) || blank($data['juri_name'] ?? null)) {
+                    return null;
+                }
+
+                return [
+                    'name' => $data['juri_name'],
+                    'address' => $this->formatLocation($data),
+                ];
+            } catch (ConnectionException) {
                 return null;
             }
         });
+    }
+
+    /**
+     * Resolve a stored entity_no back to a display name.
+     * Kept for Filament/admin callers that only need the name.
+     */
+    public function resolveEstablishmentName(?string $entityNo): ?string
+    {
+        return $this->resolveEstablishment($entityNo)['name'] ?? null;
+    }
+
+    /**
+     * Build a short, consumer-friendly location line, e.g.
+     * "Brgy. Rizal, City of San Carlos".
+     */
+    private function formatLocation(array $data): ?string
+    {
+        $barangay = trim((string) ($data['barangay'] ?? ''));
+
+        if ($barangay !== '' && ! preg_match('/^(brgy\.?|barangay)\b/i', $barangay)) {
+            $barangay = 'Brgy. '.$barangay;
+        }
+
+        $city = trim((string) ($data['city'] ?? ''))
+            ?: trim((string) ($data['province'] ?? ''));
+
+        $parts = array_filter([
+            trim((string) ($data['upblb_num'] ?? '')),
+            trim((string) ($data['subdivision'] ?? '')),
+            trim((string) ($data['street'] ?? '')),
+            $barangay,
+            $city,
+        ], fn (string $part) => $part !== '' && $part !== '.');
+
+        return $parts === [] ? null : implode(', ', $parts);
     }
 }
