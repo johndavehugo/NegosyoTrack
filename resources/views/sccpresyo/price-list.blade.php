@@ -760,15 +760,26 @@
             </span>
             @endforeach
         </div>
+        <div class="w-full flex items-center justify-center gap-1 pt-1 md:hidden">
+            <button type="button" data-open-srp
+                class="text-xs font-semibold text-green-200 hover:text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-colors">
+                About SRP
+            </button>
+            <span class="text-green-500/60" aria-hidden="true">|</span>
+            <button type="button" data-open-disclaimer
+                class="text-xs font-semibold text-green-200 hover:text-white hover:bg-white/10 px-3 py-2 rounded-lg transition-colors">
+                Disclaimer
+            </button>
+        </div>
     </div>
 </footer>
 
 {{-- ══ DETAIL MODAL ══════════════════════════════════════════════════ --}}
 <div id="detail-overlay"
-     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 sm:p-6"
+     class="sheet-overlay fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-end md:items-center justify-center p-0 md:p-6"
      style="z-index:9500">
     <div id="detail-modal"
-         class="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
+         class="sheet-panel relative bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true" aria-labelledby="modal-title">
 
         {{-- Modal header --}}
@@ -903,9 +914,9 @@
 
 {{-- ══ FAVORITES MODAL ══════════════════════════════════════════════ --}}
 <div id="favorites-overlay"
-     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center p-4 sm:p-6"
+     class="sheet-overlay fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-end md:items-center justify-center p-0 md:p-6"
      style="z-index:9500">
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
+    <div class="sheet-panel relative bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true" aria-labelledby="favorites-modal-title">
 
         {{-- Header --}}
@@ -948,8 +959,9 @@
 
 {{-- ══ ABOUT SRP MODAL ══════════════════════════════════════════════ --}}
 <div id="srp-modal-overlay"
-     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4 sm:p-6">
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+     class="sheet-overlay fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-end md:items-center justify-center p-0 md:p-6"
+     style="z-index:9500">
+    <div class="sheet-panel relative bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true">
 
         {{-- Header --}}
@@ -1041,8 +1053,9 @@
 
 {{-- ══ DISCLAIMER MODAL ══════════════════════════════════════════════ --}}
 <div id="disclaimer-modal-overlay"
-     class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden items-center justify-center p-4 sm:p-6">
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
+     class="sheet-overlay fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-end md:items-center justify-center p-0 md:p-6"
+     style="z-index:9500">
+    <div class="sheet-panel relative bg-white rounded-t-3xl md:rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden"
          role="dialog" aria-modal="true">
 
         {{-- Header --}}
@@ -1160,6 +1173,42 @@
             : '—';
     }
 
+    function esc(value) {
+        return String(value ?? '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[ch]));
+    }
+
+    // Bottom-sheet overlays: slide up on mobile, fade on desktop.
+    const sheetCloseTimers = new WeakMap();
+
+    function openSheetOverlay(el) {
+        if (!el) return;
+        const pending = sheetCloseTimers.get(el);
+        if (pending) { clearTimeout(pending); sheetCloseTimers.delete(el); }
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+        void el.offsetHeight; // commit the closed state so the transition runs
+        el.classList.add('modal-open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeSheetOverlay(el) {
+        if (!el) return;
+        el.classList.remove('modal-open');
+        document.body.style.overflow = '';
+        const existing = sheetCloseTimers.get(el);
+        if (existing) clearTimeout(existing);
+        const reducedMotion = window.matchMedia
+            && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const timer = setTimeout(() => {
+            el.classList.add('hidden');
+            el.classList.remove('flex');
+            sheetCloseTimers.delete(el);
+        }, reducedMotion ? 0 : 340);
+        sheetCloseTimers.set(el, timer);
+    }
+
     // ══════════════════════════════════════════════════════════════
     // DETAIL MODAL
     // ══════════════════════════════════════════════════════════════
@@ -1174,7 +1223,7 @@
             <div class="px-5 py-4 text-center">
                 <p class="text-[10px] text-slate-500 uppercase tracking-wider mb-1 font-semibold">${i.label}</p>
                 <p class="text-lg font-black ${i.color}">${i.value}</p>
-                <p class="text-[10px] text-slate-400 mt-0.5 truncate">${i.sub}</p>
+                <p class="text-[10px] text-slate-400 mt-0.5 truncate">${esc(i.sub)}</p>
             </div>`).join('');
     }
 
@@ -1209,11 +1258,22 @@
             row.className = `rounded-xl border transition-colors duration-150 overflow-hidden ${wrapClass}`;
             row.innerHTML = `
                 <div class="p-4">
-                    <div class="flex items-center gap-3 mb-3">
-                        <span class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-black
+                    <div class="flex items-start gap-3 mb-3">
+                        <span class="shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-black mt-0.5
                             ${isLowest ? 'bg-brand text-white' : 'bg-slate-100 text-slate-500'}">${idx + 1}</span>
-                        <p class="flex-1 font-bold text-slate-900 text-sm leading-snug truncate">${e.establishment}</p>
-                        <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md border ${sc.tag}">${statusLabel[e.status] ?? 'No data'}</span>
+                        <div class="flex-1 min-w-0">
+                            <p class="font-bold text-slate-900 text-sm leading-snug">${esc(e.establishment)}</p>
+                            ${e.address ? `<p class="mt-1 flex items-start gap-1 text-[11px] md:text-xs leading-snug text-slate-500">
+                                <svg class="w-3 h-3 mt-[1px] shrink-0 text-slate-400" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                <span>${esc(e.address)}</span>
+                            </p>` : ''}
+                        </div>
+                        <span class="shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-md border mt-0.5 ${sc.tag}">${statusLabel[e.status] ?? 'No data'}</span>
                     </div>
                     <div class="grid grid-cols-2 gap-2 ml-9">
                         <div class="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5">
@@ -1368,9 +1428,7 @@
 
     async function openDetailModal(variantId) {
         if (!detailOverlay) return;
-        detailOverlay.classList.remove('hidden');
-        detailOverlay.classList.add('flex');
-        document.body.style.overflow = 'hidden';
+        openSheetOverlay(detailOverlay);
 
         if (modalLoading) modalLoading.classList.remove('hidden');
         if (modalError)   { modalError.classList.add('hidden'); modalError.classList.remove('flex'); }
@@ -1407,9 +1465,7 @@
 
     function closeDetailModal() {
         if (!detailOverlay) return;
-        detailOverlay.classList.add('hidden');
-        detailOverlay.classList.remove('flex');
-        document.body.style.overflow = '';
+        closeSheetOverlay(detailOverlay);
         if (priceChartInstance) { priceChartInstance.destroy(); priceChartInstance = null; }
     }
 
@@ -1543,6 +1599,7 @@
 
     function saveWatchlist() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify([...watchlist]));
+        window.dispatchEvent(new CustomEvent('scc:watchlist-changed'));
     }
 
     function updateCountBadge() {
@@ -1675,18 +1732,16 @@
 
     function openFavoritesModal() {
         renderFavoritesModal();
-        favOverlay.classList.remove('hidden');
-        favOverlay.classList.add('flex');
-        document.body.style.overflow = 'hidden';
+        openSheetOverlay(favOverlay);
     }
     // Expose globally so the mobile bottom navbar can call it
     window.openFavoritesModal = openFavoritesModal;
 
     function closeFavoritesModal() {
-        favOverlay.classList.add('hidden');
-        favOverlay.classList.remove('flex');
-        document.body.style.overflow = '';
+        closeSheetOverlay(favOverlay);
+        window.dispatchEvent(new CustomEvent('scc:favorites-closed'));
     }
+    window.closeFavoritesModal = closeFavoritesModal;
 
     function renderFavoritesModal() {
         if (!favModalBody) return;
@@ -1821,8 +1876,8 @@
     const srpModalOverlay = document.getElementById('srp-modal-overlay');
     const srpModalClose   = document.getElementById('srp-modal-close');
 
-    function openSrpModal()   { srpModalOverlay?.classList.remove('hidden'); srpModalOverlay?.classList.add('flex'); document.body.style.overflow = 'hidden'; }
-    function closeSrpModal()  { srpModalOverlay?.classList.add('hidden'); srpModalOverlay?.classList.remove('flex'); document.body.style.overflow = ''; }
+    function openSrpModal()   { openSheetOverlay(srpModalOverlay); }
+    function closeSrpModal()  { closeSheetOverlay(srpModalOverlay); }
 
     srpModalClose?.addEventListener('click', closeSrpModal);
     srpModalOverlay?.addEventListener('click', e => { if (e.target === srpModalOverlay) closeSrpModal(); });
@@ -1835,8 +1890,8 @@
     const disclaimerClose   = document.getElementById('disclaimer-modal-close');
     const disclaimerAccept  = document.getElementById('disclaimer-modal-accept');
 
-    function openDisclaimerModal()  { disclaimerOverlay?.classList.remove('hidden'); disclaimerOverlay?.classList.add('flex'); document.body.style.overflow = 'hidden'; }
-    function closeDisclaimerModal() { disclaimerOverlay?.classList.add('hidden'); disclaimerOverlay?.classList.remove('flex'); document.body.style.overflow = ''; }
+    function openDisclaimerModal()  { openSheetOverlay(disclaimerOverlay); }
+    function closeDisclaimerModal() { closeSheetOverlay(disclaimerOverlay); }
 
     disclaimerClose?.addEventListener('click', closeDisclaimerModal);
     disclaimerAccept?.addEventListener('click', closeDisclaimerModal);
@@ -1886,6 +1941,14 @@
 
     sidebarSrpBtn?.addEventListener('click',  () => { openSrpModal(); });
     sidebarDiscBtn?.addEventListener('click', () => { openDisclaimerModal(); });
+
+    // Mobile footer links (sidebar is hidden below md)
+    document.querySelectorAll('[data-open-srp]').forEach(btn => {
+        btn.addEventListener('click', openSrpModal);
+    });
+    document.querySelectorAll('[data-open-disclaimer]').forEach(btn => {
+        btn.addEventListener('click', openDisclaimerModal);
+    });
 
     // Accordion: Categories
     catToggle?.addEventListener('click', () => {
