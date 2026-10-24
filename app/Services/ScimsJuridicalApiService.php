@@ -11,15 +11,21 @@ use Illuminate\Support\Facades\Http;
 
 class ScimsJuridicalApiService
 {
-    protected const BASE_URL = 'http://cictd.app/api/scims';
-
     protected const ALL_BUSINESSES_CACHE_KEY = 'scims.juridical.businesses';
+
+    protected const ALL_BUSINESSES_STALE_CACHE_KEY = 'scims.juridical.businesses.stale';
 
     protected const ALL_BUSINESSES_CACHE_TTL_HOURS = 25;
 
+    protected const ALL_BUSINESSES_STALE_CACHE_TTL_DAYS = 7;
+
+    protected ?Collection $allBusinesses = null;
+
+    protected bool $usedStaleCache = false;
+
     public function getBusiness(int $page, int $recordsPerPage, $search, ?string $sortColumn, ?string $sortDirection)
     {
-        $response = Http::baseUrl('http://cictd.app/api/scims')
+        $response = Http::baseUrl(config('scims.base_url'))
             ->get('juridical?include=employees.information,organization,address,owner.information,employer&expand=details', [
                 'per_page' => $recordsPerPage,
                 'page' => $page,
@@ -39,8 +45,8 @@ class ScimsJuridicalApiService
 
     public function getBusinessByID(string $entity_no)
     {
-        $response = Http::baseUrl('http://cictd.app/api/scims/juridical')
-            ->get("$entity_no?include=employees.information,organization,address,owner.information,employer&expand=details")
+        $response = Http::baseUrl(config('scims.base_url'))
+            ->get("juridical/$entity_no?include=employees.information,organization,address,owner.information,employer&expand=details")
             ->json('data');
 
         return $response;
@@ -53,13 +59,45 @@ class ScimsJuridicalApiService
      */
     public function getAllBusinesses(): Collection
     {
-        $businesses = Cache::remember(
-            static::ALL_BUSINESSES_CACHE_KEY,
-            now()->addHours(static::ALL_BUSINESSES_CACHE_TTL_HOURS),
-            fn (): array => $this->fetchAllBusinesses()->all(),
-        );
+        if ($this->allBusinesses instanceof Collection) {
+            return $this->allBusinesses;
+        }
 
-        return collect($businesses);
+        $this->usedStaleCache = false;
+
+        $cached = Cache::get(static::ALL_BUSINESSES_CACHE_KEY);
+
+        if (is_array($cached) && $cached !== []) {
+            return $this->allBusinesses = collect($cached);
+        }
+
+        $businesses = $this->fetchAllBusinesses();
+
+        if ($businesses->isNotEmpty()) {
+            Cache::put(
+                static::ALL_BUSINESSES_CACHE_KEY,
+                $businesses->all(),
+                now()->addHours(static::ALL_BUSINESSES_CACHE_TTL_HOURS),
+            );
+
+            Cache::put(
+                static::ALL_BUSINESSES_STALE_CACHE_KEY,
+                $businesses->all(),
+                now()->addDays(static::ALL_BUSINESSES_STALE_CACHE_TTL_DAYS),
+            );
+
+            return $this->allBusinesses = $businesses;
+        }
+
+        $stale = Cache::get(static::ALL_BUSINESSES_STALE_CACHE_KEY);
+
+        if (is_array($stale) && $stale !== []) {
+            $this->usedStaleCache = true;
+
+            return $this->allBusinesses = collect($stale);
+        }
+
+        return $this->allBusinesses = $businesses;
     }
 
     /**
@@ -69,7 +107,14 @@ class ScimsJuridicalApiService
     {
         Cache::forget(static::ALL_BUSINESSES_CACHE_KEY);
 
+        $this->allBusinesses = null;
+
         return $this->getAllBusinesses();
+    }
+
+    public function usedStaleCache(): bool
+    {
+        return $this->usedStaleCache;
     }
 
     /**
@@ -83,26 +128,30 @@ class ScimsJuridicalApiService
             'expand' => 'details',
         ];
 
-        $first = Http::baseUrl(static::BASE_URL)
-            ->timeout(30)
-            ->get('juridical', ['page' => 1, ...$parameters]);
+        try {
+            $first = Http::baseUrl(config('scims.base_url'))
+                ->timeout(30)
+                ->get('juridical', ['page' => 1, ...$parameters]);
 
-        if ($first->failed()) {
+            if ($first->failed()) {
+                return collect();
+            }
+
+            $lastPage = (int) $first->json('meta.last_page', 1);
+
+            $responses = $lastPage > 1
+                ? Http::pool(function (Pool $pool) use ($lastPage, $parameters): void {
+                    foreach (range(2, $lastPage) as $page) {
+                        $pool->as((string) $page)
+                            ->baseUrl(config('scims.base_url'))
+                            ->timeout(30)
+                            ->get('juridical', ['page' => $page, ...$parameters]);
+                    }
+                })
+                : [];
+        } catch (\Throwable) {
             return collect();
         }
-
-        $lastPage = (int) $first->json('meta.last_page', 1);
-
-        $responses = $lastPage > 1
-            ? Http::pool(function (Pool $pool) use ($lastPage, $parameters): void {
-                foreach (range(2, $lastPage) as $page) {
-                    $pool->as((string) $page)
-                        ->baseUrl(static::BASE_URL)
-                        ->timeout(30)
-                        ->get('juridical', ['page' => $page, ...$parameters]);
-                }
-            })
-            : [];
 
         return collect([$first, ...array_values($responses)])
             ->filter(fn (mixed $response): bool => $response instanceof Response && $response->successful())
@@ -120,8 +169,8 @@ class ScimsJuridicalApiService
 
     public function getEmployees(string $entity_no, int $page = 1, int $recordsPerPage = 10, ?string $search = null): LengthAwarePaginator
     {
-        $response = collect(Http::baseUrl('http://cictd.app/api/scims/juridical')
-            ->get("$entity_no?include=employees.information,organization,address,owner.information,employer&expand=details")
+        $response = collect(Http::baseUrl(config('scims.base_url'))
+            ->get("juridical/$entity_no?include=employees.information,organization,address,owner.information,employer&expand=details")
             ->json('data.employees', []));
 
         if (filled($search)) {

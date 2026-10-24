@@ -87,9 +87,9 @@ class IncidentForm
         ];
     }
 
-    public static function photoEvidenceField(): FileUpload
+    public static function photoEvidenceField(bool $compact = false): FileUpload
     {
-        return FileUpload::make('photos')
+        $field = FileUpload::make('photos')
             ->label('Photos')
             ->multiple()
             ->image()
@@ -107,9 +107,18 @@ class IncidentForm
             ->appendFiles()
             ->openable()
             ->downloadable()
-            ->panelLayout('grid')
-            ->imagePreviewHeight('140')
             ->columnSpanFull();
+
+        if ($compact) {
+            return $field
+                ->imagePreviewHeight('60')
+                ->panelAspectRatio('3:1')
+                ->panelLayout('integrated');
+        }
+
+        return $field
+            ->panelLayout('grid')
+            ->imagePreviewHeight('140');
     }
 
     public static function configure(Schema $schema): Schema

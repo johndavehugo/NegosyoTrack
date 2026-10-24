@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('scims:refresh-businesses')->daily();
+Schedule::command('calamity:prune-incident-drafts')->hourly();

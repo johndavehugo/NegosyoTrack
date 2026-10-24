@@ -12,7 +12,7 @@ class Incident extends Model
 
     protected $table = 'calamity_incidents';
 
-    protected $fillable = ['id', 'juridical_id', 'juridical_name', 'barangay', 'calamity_id', 'date_occurred', 'nature_of_damage', 'estimated_cost_of_damages', 'remarks', 'status', 'photos'];
+    protected $fillable = ['juridical_id', 'juridical_name', 'barangay', 'calamity_id', 'date_occurred', 'nature_of_damage', 'estimated_cost_of_damages', 'remarks', 'status', 'photos'];
 
     /**
      * @return array<string, string>
@@ -21,6 +21,8 @@ class Incident extends Model
     {
         return [
             'photos' => 'array',
+            'date_occurred' => 'date',
+            'estimated_cost_of_damages' => 'decimal:2',
         ];
     }
 

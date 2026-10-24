@@ -156,7 +156,7 @@ class ManageIncidents extends ManageRelatedRecords
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('incident')
+            ->recordTitleAttribute('juridical_name')
             ->defaultSort('date_occurred', 'desc')
             ->columns([
                 TextColumn::make('juridical_name')

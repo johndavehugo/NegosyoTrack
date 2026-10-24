@@ -3,9 +3,7 @@
 namespace App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Tables;
 
 use App\Services\CalamityMonitoringService;
-use App\Support\Barangays;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -18,46 +16,49 @@ class AffectedMsmeTable
                 CalamityMonitoringService $service,
                 int $page,
                 int $recordsPerPage,
-                ?string $search,
                 ?string $sortColumn,
                 ?string $sortDirection,
-                array $filters,
-            ): LengthAwarePaginator {
+            ) use ($table): LengthAwarePaginator {
+                $arguments = $table->getArguments();
+
                 return $service->paginateEstablishments(
-                    search: $search,
+                    search: $arguments['search'] ?? null,
                     page: $page,
                     recordsPerPage: $recordsPerPage,
-                    sortColumn: $sortColumn,
-                    sortDirection: $sortDirection,
-                    barangay: $filters['barangay']['value'] ?? null,
+                    sortColumn: $sortColumn ?? 'juri_name',
+                    sortDirection: $sortDirection ?? 'asc',
+                    barangay: $arguments['barangay'] ?? null,
+                    industry: $arguments['industry'] ?? null,
+                    excluded: $arguments['excluded'] ?? [],
                 );
             })
-            ->filters([
-                SelectFilter::make('barangay')
-                    ->label('Barangay')
-                    ->options(Barangays::options())
-                    ->searchable(),
-            ])
             ->defaultSort('juri_name')
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
+            ->emptyStateHeading('No MSMEs match the current filters.')
+            ->emptyStateDescription('Try a different barangay, industry, or search term.')
             ->columns([
                 TextColumn::make('juri_name')
                     ->label('MSME')
-                    ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap(),
 
                 TextColumn::make('barangay')
                     ->label('Barangay')
-                    ->searchable(),
-
-                TextColumn::make('street')
-                    ->label('Street')
-                    ->searchable(),
+                    ->badge()
+                    ->color('gray')
+                    ->sortable(),
 
                 TextColumn::make('line_of_industry')
                     ->label('Line of Industry')
+                    ->sortable()
                     ->toggleable()
-                    ->searchable(),
-            ])
-            ->searchable();
+                    ->wrap(),
+
+                TextColumn::make('street')
+                    ->label('Street')
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->wrap(),
+            ]);
     }
 }
