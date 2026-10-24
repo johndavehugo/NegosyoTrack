@@ -2,10 +2,16 @@
 
 namespace App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Schemas;
 
+use App\Models\CalamityMonitoring\Incident;
+use App\Services\CalamityMonitoringService;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\FileUpload;
+use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 
 class IncidentForm
@@ -14,9 +20,27 @@ class IncidentForm
     {
         return [
             Select::make('juridical_id')
-                ->relationship('juridical', 'name')
                 ->label('Affected MSME')
-                ->required(),
+                ->searchable()
+                ->required()
+                ->placeholder('Search an establishment')
+                ->getSearchResultsUsing(
+                    fn (string $search): array => app(CalamityMonitoringService::class)->searchEstablishments($search)
+                )
+                ->getOptionLabelUsing(
+                    fn (?string $value): ?string => app(CalamityMonitoringService::class)->resolveEstablishmentName($value) ?? $value
+                )
+                ->live()
+                ->afterStateUpdated(function (?string $state, Set $set): void {
+                    $establishment = app(CalamityMonitoringService::class)->findEstablishment($state);
+
+                    $set('juridical_name', $establishment['juri_name'] ?? $state);
+                    $set('barangay', $establishment['barangay'] ?? null);
+                }),
+
+            Hidden::make('juridical_name'),
+
+            Hidden::make('barangay'),
 
             DatePicker::make('date_occurred')
                 ->label('Date of Occurrence')
@@ -34,6 +58,7 @@ class IncidentForm
                 ->label('Estimated Cost of Damages')
                 ->numeric()
                 ->minValue(0)
+                ->maxValue(Incident::MAX_ESTIMATED_COST)
                 ->prefix('₱')
                 ->required(),
 
@@ -51,7 +76,49 @@ class IncidentForm
                 ->label('Remarks')
                 ->rows(2)
                 ->columnSpanFull(),
+
+            Section::make('Photo Evidence')
+                ->description('Attach up to 5 photos showing the damage to this MSME.')
+                ->schema([
+                    static::photoEvidenceField(),
+                ])
+                ->columns(1)
+                ->columnSpanFull(),
         ];
+    }
+
+    public static function photoEvidenceField(bool $compact = false): FileUpload
+    {
+        $field = FileUpload::make('photos')
+            ->label('Photos')
+            ->multiple()
+            ->image()
+            ->acceptedFileTypes([
+                'image/jpeg',
+                'image/png',
+                'image/webp',
+            ])
+            ->disk('public')
+            ->visibility('public')
+            ->directory('calamity-incidents/photos')
+            ->maxFiles(5)
+            ->maxSize(5120)
+            ->reorderable()
+            ->appendFiles()
+            ->openable()
+            ->downloadable()
+            ->columnSpanFull();
+
+        if ($compact) {
+            return $field
+                ->imagePreviewHeight('60')
+                ->panelAspectRatio('3:1')
+                ->panelLayout('integrated');
+        }
+
+        return $field
+            ->panelLayout('grid')
+            ->imagePreviewHeight('140');
     }
 
     public static function configure(Schema $schema): Schema

@@ -2,78 +2,63 @@
 
 namespace App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Tables;
 
-use App\Models\MsmeManagement\Address;
-use App\Models\MsmeManagement\Juridical;
+use App\Services\CalamityMonitoringService;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class AffectedMsmeTable
 {
     public static function configure(Table $table): Table
     {
         return $table
-            ->query(Juridical::query())
-            ->defaultSort('name')
+            ->records(function (
+                CalamityMonitoringService $service,
+                int $page,
+                int $recordsPerPage,
+                ?string $sortColumn,
+                ?string $sortDirection,
+            ) use ($table): LengthAwarePaginator {
+                $arguments = $table->getArguments();
+
+                return $service->paginateEstablishments(
+                    search: $arguments['search'] ?? null,
+                    page: $page,
+                    recordsPerPage: $recordsPerPage,
+                    sortColumn: $sortColumn ?? 'juri_name',
+                    sortDirection: $sortDirection ?? 'asc',
+                    barangay: $arguments['barangay'] ?? null,
+                    industry: $arguments['industry'] ?? null,
+                    excluded: $arguments['excluded'] ?? [],
+                );
+            })
+            ->defaultSort('juri_name')
+            ->paginated([10, 25, 50, 100])
+            ->defaultPaginationPageOption(25)
+            ->emptyStateHeading('No MSMEs match the current filters.')
+            ->emptyStateDescription('Try a different barangay, industry, or search term.')
             ->columns([
-                TextColumn::make('name')
+                TextColumn::make('juri_name')
                     ->label('MSME')
-                    ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap(),
 
-                TextColumn::make('address.barangay')
+                TextColumn::make('barangay')
                     ->label('Barangay')
-                    ->searchable()
+                    ->badge()
+                    ->color('gray')
                     ->sortable(),
-
-                TextColumn::make('address.street')
-                    ->label('Street')
-                    ->searchable(),
 
                 TextColumn::make('line_of_industry')
                     ->label('Line of Industry')
+                    ->sortable()
                     ->toggleable()
-                    ->searchable(),
-            ])
-            ->filters([
-                SelectFilter::make('barangay')
-                    ->label('Barangay')
-                    ->searchable()
-                    ->options(fn (): array => Address::query()
-                        ->whereHas('juridical')
-                        ->whereNotNull('barangay')
-                        ->where('barangay', '!=', '')
-                        ->orderBy('barangay')
-                        ->distinct()
-                        ->pluck('barangay', 'barangay')
-                        ->all())
-                    ->query(fn (Builder $query, array $data): Builder => $query->when(
-                        filled($data['value'] ?? null),
-                        fn (Builder $query): Builder => $query->whereHas(
-                            'address',
-                            fn (Builder $query): Builder => $query->where('barangay', $data['value']),
-                        ),
-                    )),
+                    ->wrap(),
 
-                SelectFilter::make('street')
+                TextColumn::make('street')
                     ->label('Street')
-                    ->searchable()
-                    ->options(fn (): array => Address::query()
-                        ->whereHas('juridical')
-                        ->whereNotNull('street')
-                        ->where('street', '!=', '')
-                        ->orderBy('street')
-                        ->distinct()
-                        ->pluck('street', 'street')
-                        ->all())
-                    ->query(fn (Builder $query, array $data): Builder => $query->when(
-                        filled($data['value'] ?? null),
-                        fn (Builder $query): Builder => $query->whereHas(
-                            'address',
-                            fn (Builder $query): Builder => $query->where('street', $data['value']),
-                        ),
-                    )),
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->wrap(),
             ]);
     }
 }
