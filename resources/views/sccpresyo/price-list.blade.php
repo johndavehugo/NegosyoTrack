@@ -262,15 +262,19 @@
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
 
         {{-- Title row --}}
-        <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-5 mb-3 sm:mb-6">
-            <div>
-                <h1 class="text-xl sm:text-3xl font-black text-slate-900 leading-tight tracking-tight">
-                    San Carlos City <span class="text-brand">e-Presyo</span>
-                </h1>
-                <p class="mt-1 sm:mt-1.5 text-xs sm:text-sm text-slate-500 max-w-xl leading-relaxed">
-                    Official SRP and prevailing prices of basic commodities in San Carlos City.
-                    <span class="hidden sm:inline">Click any product to compare prices across establishments.</span>
-                </p>
+        <div class="flex flex-col lg:flex-row lg:items-start justify-between gap-3 sm:gap-5 mb-3 sm:mb-6">
+            <div class="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                <x-mascot class="w-16 sm:w-20 lg:w-24 shrink-0" />
+
+                <div class="min-w-0">
+                    <h1 class="text-xl sm:text-3xl font-black text-slate-900 leading-tight tracking-tight">
+                        San Carlos City <span class="text-brand">e-Presyo</span>
+                    </h1>
+                    <p class="mt-1 sm:mt-1.5 text-xs sm:text-sm text-slate-500 max-w-xl leading-relaxed">
+                        Official SRP and prevailing prices of basic commodities in San Carlos City.
+                        <span class="hidden sm:inline">Click any product to compare prices across establishments.</span>
+                    </p>
+                </div>
             </div>
 
             {{-- Stats — horizontal scroll on mobile, wrap on sm+ --}}
@@ -290,19 +294,11 @@
             </div>
         </div>
 
-        {{-- Mobile-only filter form. The mobile selects use the form attribute
-             below so the hidden desktop selects cannot override their values. --}}
-        <form method="GET" action="{{ route('sccpresyo.index') }}" id="mobile-filter-form" class="hidden">
-            @if (filled($search))
-                <input type="hidden" name="search" value="{{ $search }}">
-            @endif
+        {{-- Filter form --}}
+        <form method="GET" action="{{ route('sccpresyo.index') }}" id="filter-form">
             @if (filled($agencyId))
                 <input type="hidden" name="agency" value="{{ $agencyId }}">
             @endif
-        </form>
-
-        {{-- Filter form --}}
-        <form method="GET" action="{{ route('sccpresyo.index') }}" id="filter-form">
 
             {{-- Desktop search row — hidden on mobile (use bottom nav Search instead) --}}
             <div class="relative mb-4 hidden sm:block">
@@ -343,13 +339,24 @@
 
             {{-- ── Filter controls row ── --}}
 
-            {{-- MOBILE layout: two rows --}}
-            <div class="sm:hidden space-y-2">
+            {{-- One set of named controls for both breakpoints. Duplicate
+                 category/sort fields submit the hidden copy last, which made
+                 mobile filters snap back to their previous values. --}}
+            <div class="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2">
 
-                {{-- Row 1: All Commodities pill (full width) + result count --}}
-                <div class="flex items-center gap-2">
+                {{-- Row 1 on mobile / inline on desktop: All Commodities + count --}}
+                <div class="flex items-center gap-2 sm:contents">
                     <button id="tab-all" type="button"
                         class="tab-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
+                               transition-all duration-200 bg-brand text-white shadow-sm shrink-0 sm:hidden">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
+                        </svg>
+                        All Commodities
+                    </button>
+
+                    <button id="tab-all-desktop" type="button"
+                        class="tab-btn hidden sm:inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
                                transition-all duration-200 bg-brand text-white shadow-sm shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
@@ -357,18 +364,19 @@
                         All Commodities
                     </button>
 
-                    {{-- Result count pill pushed to right --}}
-                    <div class="ml-auto flex items-center gap-1.5 border border-slate-200 rounded-full px-3 py-1.5 bg-slate-50 shrink-0">
+                    <div class="hidden sm:block w-px h-6 bg-slate-200 shrink-0"></div>
+
+                    {{-- Result count pill pushed to right on mobile --}}
+                    <div class="ml-auto flex items-center gap-1.5 border border-slate-200 rounded-full px-3 py-1.5 bg-slate-50 shrink-0 sm:hidden">
                         <span class="text-xs font-bold text-slate-700">{{ number_format($groups->total()) }}</span>
                         <span class="text-xs text-slate-400">{{ Str::plural('item', $groups->total()) }}</span>
                     </div>
                 </div>
 
-                {{-- Row 2: Category + Sort dropdowns side by side --}}
-                <div class="flex items-center gap-2">
-                    <select name="category" form="mobile-filter-form"
-                        onchange="document.getElementById('mobile-filter-form').submit()"
-                        class="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
+                {{-- Row 2 on mobile / inline on desktop: category + sort --}}
+                <div class="flex items-center gap-2 sm:contents">
+                    <select name="category" onchange="this.form.submit()"
+                        class="flex-1 min-w-0 sm:flex-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
                                shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
                                appearance-none cursor-pointer font-medium">
                         <option value="">All Categories</option>
@@ -379,9 +387,8 @@
                         @endforeach
                     </select>
 
-                    <select name="sort" form="mobile-filter-form"
-                        onchange="document.getElementById('mobile-filter-form').submit()"
-                        class="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
+                    <select name="sort" onchange="this.form.submit()"
+                        class="flex-1 min-w-0 sm:flex-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
                                shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
                                appearance-none cursor-pointer font-medium">
                         <option value="name_asc"  @selected($sort === 'name_asc') >Name A → Z</option>
@@ -392,8 +399,9 @@
                     </select>
 
                     @if (filled($categoryId) || filled($agencyId))
+                        {{-- Mobile: compact clear --}}
                         <a href="{{ route('sccpresyo.index', array_filter(['search' => $search ?: null, 'sort' => $sort !== 'name_asc' ? $sort : null])) }}"
-                            class="shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200
+                            class="sm:hidden shrink-0 inline-flex items-center justify-center w-9 h-9 rounded-xl border border-slate-200
                                    text-slate-400 hover:text-rose-500 hover:border-rose-200 transition-all bg-white shadow-sm"
                             title="Clear filters"
                             style="text-decoration:none">
@@ -402,71 +410,33 @@
                             </svg>
                         </a>
                     @endif
-                </div>
-            </div>
 
-            {{-- DESKTOP layout: original single-row flex (unchanged) --}}
-            <div class="hidden sm:flex flex-wrap items-center gap-2">
+                    @if (filled($search) || filled($categoryId) || filled($agencyId))
+                        {{-- Desktop: clear with label --}}
+                        <a href="{{ route('sccpresyo.index') }}"
+                            class="hidden sm:inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2
+                                   text-sm font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700
+                                   transition-all bg-white shadow-sm"
+                            style="text-decoration:none">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                            Clear
+                        </a>
+                    @endif
 
-                {{-- All Commodities tab --}}
-                <button id="tab-all-desktop" type="button"
-                    class="tab-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold
-                           transition-all duration-200 bg-brand text-white shadow-sm shrink-0">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"/>
-                    </svg>
-                    All Commodities
-                </button>
-
-                <div class="w-px h-6 bg-slate-200 shrink-0"></div>
-
-                <select name="category" onchange="this.form.submit()"
-                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
-                           shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
-                           appearance-none cursor-pointer font-medium">
-                    <option value="">All Categories</option>
-                    @foreach ($categories as $cat)
-                        <option value="{{ $cat->id }}" @selected($categoryId == $cat->id)>
-                            {{ $cat->name }} ({{ $cat->commodities_count }})
-                        </option>
-                    @endforeach
-                </select>
-
-                <select name="sort" onchange="this.form.submit()"
-                    class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
-                           shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
-                           appearance-none cursor-pointer font-medium">
-                    <option value="name_asc"  @selected($sort === 'name_asc') >Name A → Z</option>
-                    <option value="name_desc" @selected($sort === 'name_desc')>Name Z → A</option>
-                    <option value="srp_asc"   @selected($sort === 'srp_asc')  >Price: Low → High</option>
-                    <option value="srp_desc"  @selected($sort === 'srp_desc') >Price: High → Low</option>
-                    <option value="cat_asc"   @selected($sort === 'cat_asc')  >By Category</option>
-                </select>
-
-                @if (filled($search) || filled($categoryId) || filled($agencyId))
-                    <a href="{{ route('sccpresyo.index') }}"
-                        class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2
-                               text-sm font-semibold text-slate-500 hover:border-slate-300 hover:text-slate-700
-                               transition-all bg-white shadow-sm"
-                        style="text-decoration:none">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    {{-- Result count pill (desktop) --}}
+                    <div class="ml-auto hidden sm:flex items-center gap-2 border border-slate-200 rounded-full px-3.5 py-1.5 bg-slate-50 shrink-0">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
                         </svg>
-                        Clear
-                    </a>
-                @endif
-
-                {{-- Result count pill --}}
-                <div class="ml-auto flex items-center gap-2 border border-slate-200 rounded-full px-3.5 py-1.5 bg-slate-50 shrink-0">
-                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-                    </svg>
-                    <span class="text-xs font-bold text-slate-700">{{ number_format($groups->total()) }}</span>
-                    <span class="text-xs text-slate-400">{{ Str::plural('item', $groups->total()) }}</span>
+                        <span class="text-xs font-bold text-slate-700">{{ number_format($groups->total()) }}</span>
+                        <span class="text-xs text-slate-400">{{ Str::plural('item', $groups->total()) }}</span>
+                    </div>
                 </div>
-
             </div>
+
         </form>
 
     </div>
