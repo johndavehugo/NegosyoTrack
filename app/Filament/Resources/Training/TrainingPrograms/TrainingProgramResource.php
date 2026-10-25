@@ -105,9 +105,11 @@ class TrainingProgramResource extends Resource
     public static function getGlobalSearchResultDetails(Model $record): array
     {
         /** @var Training $record */
-        return [
-            'Business' => $record->business_display_name,
+        return array_filter([
+            'Business' => (filled($record->entity_no) || filled($record->business_name))
+                ? $record->business_display_name
+                : null,
             'Schedule' => $record->schedule_label,
-        ];
+        ], fn (?string $value): bool => filled($value));
     }
 }

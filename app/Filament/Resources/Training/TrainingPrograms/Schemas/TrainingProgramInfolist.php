@@ -48,6 +48,7 @@ class TrainingProgramInfolist
                 Section::make('Business')
                     ->icon(Heroicon::BuildingOffice2)
                     ->columns(2)
+                    ->visible(fn (Training $record): bool => filled($record->entity_no) || filled($record->business_name))
                     ->schema([
                         TextEntry::make('business_name')
                             ->label('Business name')

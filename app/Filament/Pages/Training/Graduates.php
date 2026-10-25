@@ -152,6 +152,7 @@ class Graduates extends Page implements HasTable
                     ->options(fn (): array => Training::query()
                         ->whereIn('id', Trainee::query()->graduates()->select('training_id'))
                         ->whereNotNull('business_name')
+                        ->whereNotNull('entity_no')
                         ->orderBy('business_name')
                         ->pluck('business_name', 'entity_no')
                         ->all())

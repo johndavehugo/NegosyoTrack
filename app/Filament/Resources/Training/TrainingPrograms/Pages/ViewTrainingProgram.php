@@ -32,6 +32,7 @@ class ViewTrainingProgram extends ViewRecord
                 ->label('Refresh business')
                 ->icon(Heroicon::ArrowPath)
                 ->color('gray')
+                ->visible(fn (): bool => filled($this->getRecord()->entity_no))
                 ->action(function (): void {
                     if ($this->getRecord()->refreshBusinessName()) {
                         Notification::make()

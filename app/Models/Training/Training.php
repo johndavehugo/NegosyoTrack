@@ -52,6 +52,12 @@ class Training extends Model
                 return;
             }
 
+            if (blank($training->entity_no)) {
+                $training->business_name = null;
+
+                return;
+            }
+
             $training->business_name = app(ScimsTrainingService::class)->businessName($training->entity_no);
         });
 
@@ -71,6 +77,10 @@ class Training extends Model
      */
     public function refreshBusinessName(): bool
     {
+        if (blank($this->entity_no)) {
+            return false;
+        }
+
         $name = app(ScimsTrainingService::class)->businessName($this->entity_no);
 
         if (blank($name)) {
@@ -87,9 +97,13 @@ class Training extends Model
      */
     protected function businessDisplayName(): Attribute
     {
-        return Attribute::get(fn (): string => filled($this->business_name)
-            ? $this->business_name
-            : $this->entity_no);
+        return Attribute::get(function (): string {
+            if (filled($this->business_name)) {
+                return $this->business_name;
+            }
+
+            return filled($this->entity_no) ? $this->entity_no : '—';
+        });
     }
 
     /**
