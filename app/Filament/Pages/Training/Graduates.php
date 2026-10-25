@@ -6,7 +6,6 @@ use App\Enums\TrainingStatus;
 use App\Filament\Resources\Training\Trainees\TraineesResource;
 use App\Filament\Resources\Training\TrainingPrograms\TrainingProgramResource;
 use App\Models\Training\Trainee;
-use App\Models\Training\Training;
 use App\Models\Training\TrainingDetail;
 use BackedEnum;
 use Filament\Actions\Action;
@@ -88,11 +87,6 @@ class Graduates extends Page implements HasTable
                         ? TrainingProgramResource::getUrl('view', ['record' => $record->training])
                         : null),
 
-                TextColumn::make('business')
-                    ->label('Business')
-                    ->state(fn (Trainee $record): string => $record->training?->business_display_name ?? '—')
-                    ->wrap(),
-
                 TextColumn::make('trainingDetails.graduated_at')
                     ->label('Graduated')
                     ->date('M d, Y')
@@ -146,23 +140,6 @@ class Graduates extends Page implements HasTable
                     ->label('Training program')
                     ->relationship('training', 'training_program')
                     ->searchable(),
-
-                SelectFilter::make('business')
-                    ->label('Business')
-                    ->options(fn (): array => Training::query()
-                        ->whereIn('id', Trainee::query()->graduates()->select('training_id'))
-                        ->whereNotNull('business_name')
-                        ->whereNotNull('entity_no')
-                        ->orderBy('business_name')
-                        ->pluck('business_name', 'entity_no')
-                        ->all())
-                    ->searchable()
-                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
-                        ? $query->whereHas(
-                            'training',
-                            fn (Builder $query): Builder => $query->where('entity_no', $data['value']),
-                        )
-                        : $query),
             ])
             ->recordActions([
                 ActionGroup::make([

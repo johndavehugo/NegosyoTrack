@@ -95,8 +95,6 @@ class TrainingProgramResource extends Resource
     {
         return [
             'training_program',
-            'business_name',
-            'entity_no',
             'training_type',
             'conducted_by',
         ];
@@ -105,11 +103,8 @@ class TrainingProgramResource extends Resource
     public static function getGlobalSearchResultDetails(Model $record): array
     {
         /** @var Training $record */
-        return array_filter([
-            'Business' => (filled($record->entity_no) || filled($record->business_name))
-                ? $record->business_display_name
-                : null,
+        return [
             'Schedule' => $record->schedule_label,
-        ], fn (?string $value): bool => filled($value));
+        ];
     }
 }

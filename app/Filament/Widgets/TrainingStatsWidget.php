@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\Training\Trainee;
 use App\Models\Training\Training;
 use Filament\Support\Colors\Color;
 use Filament\Support\Icons\Heroicon;
@@ -16,11 +17,11 @@ class TrainingStatsWidget extends StatsOverviewWidget
 
     protected function getStats(): array
     {
-        $total      = Training::count();
-        $completed  = Training::where('status', 'COMPLETED')->count();
-        $ongoing    = Training::where('status', 'ONGOING')->count();
-        $thisYear   = Training::whereYear('from_date', now()->year)->count();
-        $businesses = Training::distinct('entity_no')->count('entity_no');
+        $total = Training::count();
+        $completed = Training::where('status', 'COMPLETED')->count();
+        $ongoing = Training::where('status', 'ONGOING')->count();
+        $thisYear = Training::whereYear('from_date', now()->year)->count();
+        $trainees = Trainee::count();
 
         return [
             Stat::make('Training Records', number_format($total))
@@ -33,9 +34,9 @@ class TrainingStatsWidget extends StatsOverviewWidget
                 ->descriptionIcon(Heroicon::CheckBadge)
                 ->color(Color::Green),
 
-            Stat::make('Businesses Trained', number_format($businesses))
-                ->description('Unique MSMEs with training records')
-                ->descriptionIcon(Heroicon::BuildingStorefront)
+            Stat::make('Trainees Trained', number_format($trainees))
+                ->description('People enrolled across all records')
+                ->descriptionIcon(Heroicon::UserGroup)
                 ->color(Color::Teal),
         ];
     }
