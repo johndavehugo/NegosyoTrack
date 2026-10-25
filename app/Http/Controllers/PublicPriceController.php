@@ -234,15 +234,17 @@ class PublicPriceController extends Controller
             $diff = ($srp !== null && $prevailing !== null) ? round($prevailing - $srp, 2) : null;
             $pct = ($diff !== null && $srp > 0) ? round(($diff / $srp) * 100, 1) : null;
 
-            $estName = $sib->juridical_id
-                ? ($svc->resolveEstablishmentName($sib->juridical_id) ?? $sib->juridical_id)
-                : 'Unknown Establishment';
+            $establishment = $sib->juridical_id
+                ? $svc->resolveEstablishment($sib->juridical_id)
+                : null;
+
+            $estName = $establishment['name'] ?? ($sib->juridical_id ?: 'Unknown Establishment');
 
             return [
                 'variant_id' => $sibVariant->id,
                 'is_current' => $sibVariant->id === $variant->id,
                 'establishment' => $estName,
-                'address' => null,
+                'address' => $establishment['address'] ?? null,
                 'contact_no' => null,
                 'unit' => $sibVariant->unit_of_measure,
                 'srp' => $srp,
