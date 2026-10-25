@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Msme;
 
 use App\Filament\Actions\RowClickAction;
 use App\Services\ScimsJuridicalApiService;
+use App\Services\Training\LocalGraduateTrainings;
 use Filament\Pages\Page;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
@@ -17,15 +18,20 @@ use Illuminate\Pagination\LengthAwarePaginator;
 class Employees extends Page implements HasTable
 {
     use InteractsWithTable;
+
     protected static bool $shouldRegisterNavigation = false;
+
     public string $entity_no;
+
     protected static ?string $slug = 'business/{entity_no}/employees';
+
     protected string $view = 'filament.pages.msme.employees';
+
     public function getBreadcrumbs(): array
     {
         return [
             Businesses::getUrl() => 'Businesses',
-            ViewBusiness::getUrl(['entity_no' => $this->entity_no,]) => 'View Business',
+            ViewBusiness::getUrl(['entity_no' => $this->entity_no]) => 'View Business',
             'Employees',
         ];
     }
@@ -39,13 +45,30 @@ class Employees extends Page implements HasTable
     {
         return $table
             ->deferLoading()
-            ->records(function (ScimsJuridicalApiService $scimsApi, int $page, int $recordsPerPage, ?string $search): LengthAwarePaginator {
-                return $scimsApi->getEmployees(
+            ->records(function (ScimsJuridicalApiService $scimsApi, LocalGraduateTrainings $localGraduateTrainings, int $page, int $recordsPerPage, ?string $search): LengthAwarePaginator {
+                $employees = $scimsApi->getEmployees(
                     entity_no: $this->entity_no,
                     page: $page,
                     recordsPerPage: $recordsPerPage,
                     search: $search
                 );
+
+                $localGraduates = $localGraduateTrainings->forEntityNumbers(
+                    $employees->getCollection()->keys()->all()
+                );
+
+                $employees->setCollection(
+                    $employees->getCollection()->map(function (array $employee) use ($localGraduates): array {
+                        $employee['trainings'] = array_merge(
+                            $employee['trainings'] ?? [],
+                            $localGraduates[$employee['entity_no'] ?? ''] ?? [],
+                        );
+
+                        return $employee;
+                    })
+                );
+
+                return $employees;
             })
             ->columns([
                 TextColumn::make('entity_no')
@@ -63,7 +86,7 @@ class Employees extends Page implements HasTable
                     ->toggleable(),
                 TextColumn::make('employment_id')
                     ->label('Employment ID')
-                    ->toggleable(isToggledHiddenByDefault: True),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('work_id')
                     ->label('Work ID')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -82,7 +105,7 @@ class Employees extends Page implements HasTable
                     ->boolean()
                     ->state(fn (array $record): bool => filled($record['trainings'] ?? []))
                     ->alignCenter(),
-                ])
+            ])
             ->filters([
 
             ])
@@ -103,6 +126,6 @@ class Employees extends Page implements HasTable
             ->paginated([10, 25, 50])
             ->defaultPaginationPageOption(10)
             ->searchable();
-        
+
     }
 }

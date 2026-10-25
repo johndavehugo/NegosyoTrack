@@ -35,7 +35,7 @@
         </h3>
 
         <p class="mt-1 max-w-xs text-xs text-gray-500 dark:text-gray-400">
-            This employee has no training records in SCIMS yet.
+            This employee has no training records in SCIMS or the local training module yet.
         </p>
     </div>
 @else
@@ -53,7 +53,7 @@
             </p>
 
             <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                {{ $statusSummary !== '' ? $statusSummary : 'Synced from SCIMS' }}
+                {{ $statusSummary !== '' ? $statusSummary : 'From SCIMS and local training records' }}
             </p>
         </div>
     </div>
