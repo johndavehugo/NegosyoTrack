@@ -4,6 +4,7 @@ namespace App\Filament\Pages\Msme;
 
 use App\Services\ScimsJuridicalApiService;
 use Filament\Pages\Page;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -73,7 +74,12 @@ class Employees extends Page implements HasTable
                 TextColumn::make('work_nature')
                     ->label('Nature of Work')
                     ->toggleable(),
-            ])
+                IconColumn::make('has_trainings')
+                    ->label('Has Training')
+                    ->boolean()
+                    ->state(fn (array $record): bool => filled($record['trainings'] ?? []))
+                    ->alignCenter(),
+                ])
             ->filters([
 
             ])

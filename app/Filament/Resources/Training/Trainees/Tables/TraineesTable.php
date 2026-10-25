@@ -14,6 +14,7 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Actions\ViewAction;
+use Filament\Forms\Components\DatePicker;
 use Filament\Notifications\Notification;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -47,6 +48,15 @@ class TraineesTable
                     ->url(fn (Trainee $record): ?string => $record->training
                         ? TrainingProgramResource::getUrl('view', ['record' => $record->training])
                         : null),
+
+                TextColumn::make('trainingDetails.graduated_at')
+                    ->label('Graduated')
+                    ->date('M d, Y')
+                    ->placeholder('—')
+                    ->icon(fn (Trainee $record): ?Heroicon => $record->isGraduate() ? Heroicon::CheckBadge : null)
+                    ->color(fn (Trainee $record): string => $record->isGraduate() ? 'success' : 'gray')
+                    ->sortable()
+                    ->toggleable(),
 
                 TextColumn::make('gender')
                     ->label('Gender')
@@ -114,6 +124,69 @@ class TraineesTable
 
                     EditAction::make(),
 
+                    Action::make('markAsGraduate')
+                        ->label('Mark as graduate')
+                        ->icon(Heroicon::CheckBadge)
+                        ->color('success')
+                        ->visible(fn (Trainee $record): bool => ! $record->isGraduate())
+                        ->fillForm(fn (Trainee $record): array => [
+                            'graduated_at' => ($record->training?->graduated_at
+                                ?? $record->training?->to_date
+                                ?? now())->toDateString(),
+                        ])
+                        ->schema([
+                            DatePicker::make('graduated_at')
+                                ->label('Graduated on')
+                                ->required()
+                                ->helperText('Defaults to the training graduation date, then the training end date.'),
+                        ])
+                        ->action(function (Trainee $record, array $data): void {
+                            $record->markAsGraduate($data['graduated_at']);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Trainee marked as graduate')
+                                ->send();
+                        }),
+
+                    Action::make('editGraduation')
+                        ->label('Edit graduation date')
+                        ->icon(Heroicon::CalendarDays)
+                        ->visible(fn (Trainee $record): bool => $record->isGraduate())
+                        ->fillForm(fn (Trainee $record): array => [
+                            'graduated_at' => $record->trainingDetails?->graduated_at?->toDateString(),
+                        ])
+                        ->schema([
+                            DatePicker::make('graduated_at')
+                                ->label('Graduated on')
+                                ->required(),
+                        ])
+                        ->action(function (Trainee $record, array $data): void {
+                            $record->updateGraduationDate($data['graduated_at']);
+
+                            Notification::make()
+                                ->success()
+                                ->title('Graduation date updated')
+                                ->send();
+                        }),
+
+                    Action::make('removeGraduate')
+                        ->label('Remove from graduates')
+                        ->icon(Heroicon::XCircle)
+                        ->color('danger')
+                        ->visible(fn (Trainee $record): bool => $record->isGraduate())
+                        ->requiresConfirmation()
+                        ->modalHeading('Remove graduate record')
+                        ->modalDescription('The trainee stays enrolled in the training, but their completion record and graduation date are deleted.')
+                        ->action(function (Trainee $record): void {
+                            $record->removeGraduateRecord();
+
+                            Notification::make()
+                                ->success()
+                                ->title('Graduate record removed')
+                                ->send();
+                        }),
+
                     Action::make('viewTraining')
                         ->label('View training')
                         ->icon(Heroicon::AcademicCap)
@@ -147,6 +220,41 @@ class TraineesTable
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    BulkAction::make('markAsGraduate')
+                        ->label('Mark as graduates')
+                        ->icon(Heroicon::CheckBadge)
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->modalHeading('Mark selected trainees as graduates')
+                        ->modalDescription('Graduation dates default to each training\'s graduation date, then its end date, then today. Trainees already marked are skipped.')
+                        ->action(function (Collection $records): void {
+                            $marked = 0;
+                            $skipped = 0;
+
+                            foreach ($records as $record) {
+                                /** @var Trainee $record */
+                                if ($record->isGraduate()) {
+                                    $skipped++;
+
+                                    continue;
+                                }
+
+                                $record->markAsGraduate();
+                                $marked++;
+                            }
+
+                            $notification = $marked > 0
+                                ? Notification::make()->success()->title($marked.' trainee(s) marked as graduates')
+                                : Notification::make()->warning()->title('No trainees were marked');
+
+                            if ($skipped > 0) {
+                                $notification->body($skipped.' trainee(s) were already graduates.');
+                            }
+
+                            $notification->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
                     BulkAction::make('refreshScims')
                         ->label('Refresh from SCIMS')
                         ->icon(Heroicon::ArrowPath)

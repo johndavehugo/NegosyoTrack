@@ -37,7 +37,7 @@ class ScimsJuridicalApiService
 
     public function getEmployees(string $entity_no, int $page = 1, int $recordsPerPage = 10, ?string $search = null): LengthAwarePaginator {
         $response = collect(Http::baseUrl('http://cictd.app/api/scims/juridical')
-                ->get("$entity_no?include=employees.information,organization,address,owner.information,employer&expand=details")
+                ->get("$entity_no?include=employees.information,organization,address,owner.information,employer,trainings&expand=details")
                 ->json('data.employees', []));
 
         if (filled($search)) {

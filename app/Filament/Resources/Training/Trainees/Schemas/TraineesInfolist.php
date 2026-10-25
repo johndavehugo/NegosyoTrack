@@ -95,6 +95,23 @@ class TraineesInfolist
                             ->label('Conducted by')
                             ->placeholder('—'),
                     ]),
+
+                Section::make('Graduation')
+                    ->description('A personal completion record puts this trainee on the Graduates page.')
+                    ->icon(Heroicon::CheckBadge)
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('graduation_status')
+                            ->label('Graduation status')
+                            ->state(fn (Trainee $record): string => $record->trainingDetails?->status?->getLabel() ?? 'Not graduated')
+                            ->badge()
+                            ->color(fn (Trainee $record): string|array|null => $record->trainingDetails?->status?->getColor() ?? 'gray'),
+
+                        TextEntry::make('trainingDetails.graduated_at')
+                            ->label('Graduated on')
+                            ->date('M d, Y')
+                            ->placeholder('—'),
+                    ]),
             ]);
     }
 }

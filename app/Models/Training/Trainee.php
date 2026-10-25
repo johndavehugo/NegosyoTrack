@@ -2,7 +2,10 @@
 
 namespace App\Models\Training;
 
+use App\Enums\TrainingStatus;
 use App\Services\Training\ScimsTrainingService;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -28,6 +31,7 @@ class Trainee extends Model
         'birth_date',
         'mobile_no',
         'training_id',
+        'training_details_id',
         'contact_no',
     ];
 
@@ -54,6 +58,96 @@ class Trainee extends Model
     public function training(): BelongsTo
     {
         return $this->belongsTo(Training::class, 'training_id', 'id');
+    }
+
+    /**
+     * The trainee's personal completion record (status + graduation date).
+     */
+    public function trainingDetails(): BelongsTo
+    {
+        return $this->belongsTo(TrainingDetail::class, 'training_details_id', 'id');
+    }
+
+    /**
+     * Trainees with a completed personal completion record.
+     */
+    public function scopeGraduates(Builder $query): Builder
+    {
+        return $query->whereHas(
+            'trainingDetails',
+            fn (Builder $query): Builder => $query->where('status', TrainingStatus::Completed->value),
+        );
+    }
+
+    /**
+     * Whether this trainee's own record marks them as a graduate.
+     */
+    public function isGraduate(): bool
+    {
+        return $this->trainingDetails?->status === TrainingStatus::Completed;
+    }
+
+    /**
+     * Create or update this trainee's completion record and mark them as a
+     * graduate. Without an explicit date the training-level graduation date
+     * is used, then its end date, then today.
+     */
+    public function markAsGraduate(CarbonInterface|string|null $graduatedAt = null): TrainingDetail
+    {
+        $graduatedAt ??= $this->training?->graduated_at
+            ?? $this->training?->to_date
+            ?? now();
+
+        $detail = $this->trainingDetails ?? new TrainingDetail;
+
+        $detail->fill([
+            'status' => TrainingStatus::Completed,
+            'graduated_at' => $graduatedAt,
+        ])->save();
+
+        if ($this->training_details_id !== $detail->id) {
+            $this->forceFill(['training_details_id' => $detail->id])->save();
+        }
+
+        $this->setRelation('trainingDetails', $detail);
+
+        return $detail;
+    }
+
+    /**
+     * Change the graduation date without touching the completion status.
+     */
+    public function updateGraduationDate(CarbonInterface|string $graduatedAt): bool
+    {
+        $detail = $this->trainingDetails;
+
+        if (! $detail) {
+            return false;
+        }
+
+        $detail->update(['graduated_at' => $graduatedAt]);
+
+        return true;
+    }
+
+    /**
+     * Delete the completion record. The foreign key unlinks the trainee, so
+     * they stay enrolled in the training but leave the graduates list.
+     */
+    public function removeGraduateRecord(): bool
+    {
+        $detail = $this->trainingDetails;
+
+        if (! $detail) {
+            return false;
+        }
+
+        $detail->delete();
+
+        $this->unsetRelation('trainingDetails');
+        $this->forceFill(['training_details_id' => null])->saveQuietly();
+
+        return true;
     }
 
     /**
