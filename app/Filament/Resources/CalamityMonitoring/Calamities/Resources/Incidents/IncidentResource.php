@@ -29,7 +29,7 @@ class IncidentResource extends Resource
             ->page('manage-incidents');
     }
 
-    protected static ?string $recordTitleAttribute = 'incident';
+    protected static ?string $recordTitleAttribute = 'juridical_name';
 
     public static function form(Schema $schema): Schema
     {

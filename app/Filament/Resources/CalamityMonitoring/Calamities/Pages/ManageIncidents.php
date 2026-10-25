@@ -6,8 +6,12 @@ use App\Filament\Resources\CalamityMonitoring\Calamities\CalamityResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\IncidentResource;
 use App\Filament\Resources\CalamityMonitoring\Calamities\Resources\Incidents\Schemas\IncidentForm;
 use App\Filament\Widgets\IncidentStatsWidget;
-use App\Models\MsmeManagement\Address;
+use App\Models\CalamityMonitoring\Incident;
+use App\Services\CalamityMonitoring\ReportExporter;
+use App\Services\CalamityMonitoringService;
+use App\Support\Barangays;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\CreateAction;
@@ -15,6 +19,7 @@ use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\DatePicker;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ManageRelatedRecords;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Components\Section;
@@ -22,11 +27,15 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class ManageIncidents extends ManageRelatedRecords
 {
@@ -47,6 +56,41 @@ class ManageIncidents extends ManageRelatedRecords
         return [
             IncidentStatsWidget::class,
         ];
+    }
+
+    public function exportReport(string $format): BinaryFileResponse
+    {
+        return app(ReportExporter::class)->download(
+            $this->getOwnerRecord(),
+            $this->getTableQueryForExport(),
+            $format,
+        );
+    }
+
+    public function deleteIncidentPhoto(int $record, string $photo): void
+    {
+        $incident = $this->getOwnerRecord()
+            ->incident()
+            ->whereKey($record)
+            ->firstOrFail();
+
+        $photos = collect($incident->photos ?? [])
+            ->reject(fn (string $path): bool => $path === $photo)
+            ->values()
+            ->all();
+
+        $incident->update(['photos' => $photos]);
+
+        if ($photos === []) {
+            $this->unmountAction();
+        } else {
+            $this->getMountedAction()?->record($incident->fresh());
+        }
+
+        Notification::make()
+            ->title('Photo deleted')
+            ->success()
+            ->send();
     }
 
     /**
@@ -112,13 +156,30 @@ class ManageIncidents extends ManageRelatedRecords
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('incident')
+            ->recordTitleAttribute('juridical_name')
             ->defaultSort('date_occurred', 'desc')
             ->columns([
-                TextColumn::make('juridical.name')
+                TextColumn::make('juridical_name')
                     ->label('Affected MSME')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->placeholder('—')
+                    ->formatStateUsing(function (?string $state, Incident $record): string {
+                        if (filled($state)) {
+                            return $state;
+                        }
+
+                        return app(CalamityMonitoringService::class)
+                            ->resolveEstablishmentName($record->juridical_id)
+                            ?? $record->juridical_id;
+                    })
+                    ->tooltip(fn (Incident $record): ?string => $record->juridical_id),
+
+                ViewColumn::make('photos')
+                    ->label('Photo Evidence')
+                    ->view('filament.calamity-monitoring.photos-column')
+                    ->alignCenter()
+                    ->toggleable(),
 
                 TextColumn::make('date_occurred')
                     ->label('Date Occurred')
@@ -127,16 +188,7 @@ class ManageIncidents extends ManageRelatedRecords
 
                 TextColumn::make('nature_of_damage')
                     ->label('Damage')
-                    ->formatStateUsing(
-                        fn (?string $state): string => match ($state) {
-                            'PARTIAL' => 'Partial Damage',
-                            'TOTAL' => 'Total Damage',
-                            default => str($state ?? 'Unknown')
-                                ->replace('_', ' ')
-                                ->title()
-                                ->toString(),
-                        }
-                    )
+                    ->formatStateUsing(fn (?string $state): string => Incident::natureLabel($state))
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'PARTIAL' => 'warning',
@@ -155,17 +207,7 @@ class ManageIncidents extends ManageRelatedRecords
 
                 TextColumn::make('status')
                     ->label('Verification Status')
-                    ->formatStateUsing(
-                        fn (?string $state): string => match ($state) {
-                            'PENDING_VERIFICATION' => 'Pending Verification',
-                            'VERIFIED' => 'Verified',
-                            'AID_RELEASED' => 'Aid Released',
-                            default => str($state ?? 'Unknown')
-                                ->replace('_', ' ')
-                                ->title()
-                                ->toString(),
-                        }
-                    )
+                    ->formatStateUsing(fn (?string $state): string => Incident::statusLabel($state))
                     ->badge()
                     ->color(fn (?string $state): string => match ($state) {
                         'PENDING_VERIFICATION' => 'warning',
@@ -190,43 +232,22 @@ class ManageIncidents extends ManageRelatedRecords
                 SelectFilter::make('barangay')
                     ->label('Barangay')
                     ->searchable()
-                    ->options(function (): array {
-                        return Address::query()
-                            ->whereHas(
-                                'juridical.incident',
-                                fn (Builder $query): Builder => $query->whereBelongsTo($this->getOwnerRecord()),
-                            )
-                            ->whereNotNull('barangay')
-                            ->where('barangay', '!=', '')
-                            ->orderBy('barangay')
-                            ->distinct()
-                            ->pluck('barangay', 'barangay')
-                            ->all();
-                    })
-                    ->query(function (Builder $query, array $data): Builder {
-                        return $query->when(
-                            filled($data['value'] ?? null),
-                            fn (Builder $query): Builder => $query->whereHas(
-                                'juridical.address',
-                                fn (Builder $query): Builder => $query->where('barangay', $data['value']),
-                            ),
-                        );
-                    }),
+                    ->options(fn (): array => Barangays::options() + $this->getOwnerRecord()
+                        ->incident()
+                        ->whereNotNull('barangay')
+                        ->where('barangay', '!=', '')
+                        ->orderBy('barangay')
+                        ->distinct()
+                        ->pluck('barangay', 'barangay')
+                        ->all()),
 
                 SelectFilter::make('status')
                     ->label('Verification Status')
-                    ->options([
-                        'PENDING_VERIFICATION' => 'Pending Verification',
-                        'VERIFIED' => 'Verified',
-                        'AID_RELEASED' => 'Aid Released',
-                    ]),
+                    ->options(Incident::statusOptions()),
 
                 SelectFilter::make('nature_of_damage')
                     ->label('Nature of Damage')
-                    ->options([
-                        'PARTIAL' => 'Partial Damage',
-                        'TOTAL' => 'Total Damage',
-                    ]),
+                    ->options(Incident::natureOptions()),
 
                 Filter::make('date_occurred')
                     ->label('Date Occurred')
@@ -247,6 +268,18 @@ class ManageIncidents extends ManageRelatedRecords
             ->headerActions([
                 CreateAction::make()
                     ->label('Create Incident'),
+
+                Action::make('exportExcel')
+                    ->label('Export Excel')
+                    ->icon(Heroicon::ArrowDownTray)
+                    ->color('gray')
+                    ->action(fn (): BinaryFileResponse => $this->exportReport('xlsx')),
+
+                Action::make('exportCsv')
+                    ->label('Export CSV')
+                    ->icon(Heroicon::ArrowDownTray)
+                    ->color('gray')
+                    ->action(fn (): BinaryFileResponse => $this->exportReport('csv')),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
@@ -272,6 +305,47 @@ class ManageIncidents extends ManageRelatedRecords
                 ]),
             ])
             ->recordActions([
+                Action::make('viewPhotos')
+                    ->label('View images')
+                    ->icon(Heroicon::Photo)
+                    ->color('gray')
+                    ->visible(fn (Incident $record): bool => filled($record->photos))
+                    ->modalHeading(fn (Incident $record): string => 'Photo Evidence: '.($record->juridical_name ?: $record->juridical_id))
+                    ->modalDescription(fn (Incident $record): string => $record->barangay ?: 'Unspecified barangay')
+                    ->modalWidth('5xl')
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close')
+                    ->modalContent(function (Incident $record): View {
+                        $photos = collect($record->photos ?? [])
+                            ->filter(fn (string $photo): bool => Storage::disk('public')->exists($photo))
+                            ->map(fn (string $photo): array => [
+                                'path' => $photo,
+                                'url' => '/storage/'.ltrim($photo, '/'),
+                            ])
+                            ->values()
+                            ->all();
+
+                        return view('filament.calamity-monitoring.incident-photos', [
+                            'photos' => $photos,
+                            'incident' => $record,
+                        ]);
+                    }),
+
+                Action::make('addPhotos')
+                    ->label('Add photo')
+                    ->icon(Heroicon::Photo)
+                    ->color('primary')
+                    ->visible(fn (Incident $record): bool => blank($record->photos))
+                    ->schema([
+                        IncidentForm::photoEvidenceField(),
+                    ])
+                    ->action(function (Incident $record, array $data): void {
+                        $record->update([
+                            'photos' => array_values($data['photos'] ?? []),
+                        ]);
+                    })
+                    ->successNotificationTitle('Photo evidence added.'),
+
                 EditAction::make(),
             ]);
     }
