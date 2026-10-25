@@ -22,12 +22,12 @@ class TraineesForm
         return $schema
             ->components([
                 Section::make('Trainee')
-                    ->description('Pick the person from SCIMS. Their name and contact details are saved locally so lists and reports stay fast.')
+                    ->description('Pick the person from SCIMS. SCIMS owns their name, gender, birth date and mobile number; this enrollment stores only the link and your contact number.')
                     ->icon(Heroicon::User)
                     ->columns(2)
                     ->schema([
-                        // Only api_entity_no is the link back to SCIMS; the
-                        // identity fields are snapshotted for local use.
+                        // Only api_entity_no is stored. Identity fields are
+                        // read from SCIMS whenever they are displayed.
                         Select::make('api_entity_no')
                             ->label('Trainee (from SCIMS)')
                             ->required()
@@ -60,7 +60,7 @@ class TraineesForm
                     ]),
 
                 Section::make('Enrollment')
-                    ->description('Choose the training this person attended and confirm their contact number.')
+                    ->description('Choose the training this person attended and confirm the contact number for this enrollment.')
                     ->icon(Heroicon::AcademicCap)
                     ->columns(2)
                     ->schema([
@@ -81,7 +81,7 @@ class TraineesForm
                             ->required()
                             ->tel()
                             ->maxLength(255)
-                            ->helperText('Filled from SCIMS when a mobile number is available.'),
+                            ->helperText('Stored with this enrollment only. Filled from the SCIMS mobile number when one is available.'),
                     ]),
             ]);
     }
@@ -105,7 +105,7 @@ class TraineesForm
     protected static function individualDetailsHtml(?string $entityNo): Htmlable
     {
         if (blank($entityNo)) {
-            $hint = 'Pick a trainee above to preview their name, gender, birth date and mobile number from SCIMS.';
+            $hint = 'Pick a trainee above to preview their identity from SCIMS. These details are not saved locally.';
 
             return new HtmlString('<p class="text-gray-500 dark:text-gray-400">'.e($hint).'</p>');
         }
@@ -113,7 +113,7 @@ class TraineesForm
         $individual = app(ScimsTrainingService::class)->findIndividual($entityNo);
 
         if (blank($individual)) {
-            $notice = 'SCIMS details unavailable for ('.$entityNo.') — the entity_no will still be saved.';
+            $notice = 'SCIMS details are unavailable for ('.$entityNo.'). The entity number can still be saved and the details will load when SCIMS is reachable.';
 
             return new HtmlString('<p class="text-gray-500 dark:text-gray-400">'.e($notice).'</p>');
         }
