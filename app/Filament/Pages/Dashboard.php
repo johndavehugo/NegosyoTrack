@@ -24,7 +24,6 @@ class Dashboard extends BaseDashboard
             MsmeRegistrationChartWidget::class,
             MsmeCategoryDonutWidget::class,
             IndustryDistributionChartWidget::class,
-            MsmeStatusDonutWidget::class,
             CalamityDamageChartWidget::class,
             TrainingStatsWidget::class,
         ];

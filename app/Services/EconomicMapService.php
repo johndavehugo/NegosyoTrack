@@ -168,11 +168,12 @@ class EconomicMapService
     }
 
     /**
-     * Convert a flat SCIMS juridical row into the shape used by the maps.
+     * Convert a flat SCIMS juridical row into the shape used by the maps and
+     * dashboard.
      *
-     * Only fields the Economic Map reads are retained. SCIMS returns several
-     * dozen columns (owner, employer, contact, etc.); keeping them would make
-     * the cached snapshot several times larger for no map benefit.
+     * Only fields the map and dashboard read are retained. SCIMS returns
+     * several dozen columns (owner, employer, contact, etc.); keeping them
+     * would make the cached snapshot several times larger for no benefit.
      */
     protected function normalizeScimsRow(array $row): array
     {
@@ -181,6 +182,7 @@ class EconomicMapService
                 'entity_no' => $row['entity_no'] ?? null,
                 'name' => $row['juri_name'] ?? $row['trade_name'] ?? null,
                 'registration_type' => $row['status'] ?? null,
+                'registration_date' => $row['juri_date_reg'] ?? null,
                 'msme_category' => $row['juri_category'] ?? null,
                 'line_of_industry' => $row['line_of_industry'] ?? null,
                 'region' => $row['region'] ?? null,
