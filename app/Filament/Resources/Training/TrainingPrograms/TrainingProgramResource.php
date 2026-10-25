@@ -95,8 +95,6 @@ class TrainingProgramResource extends Resource
     {
         return [
             'training_program',
-            'business_name',
-            'entity_no',
             'training_type',
             'conducted_by',
         ];
@@ -106,7 +104,6 @@ class TrainingProgramResource extends Resource
     {
         /** @var Training $record */
         return [
-            'Business' => $record->business_display_name,
             'Schedule' => $record->schedule_label,
         ];
     }
