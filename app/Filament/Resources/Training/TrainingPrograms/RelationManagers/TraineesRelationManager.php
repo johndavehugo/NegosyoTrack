@@ -15,6 +15,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class TraineesRelationManager extends RelationManager
@@ -46,12 +47,9 @@ class TraineesRelationManager extends RelationManager
     {
         return $table
             ->columns([
-                TextColumn::make('full_name')
+                TextColumn::make('display_name')
                     ->label('Trainee')
-                    ->state(fn (Trainee $record): string => $record->display_name)
                     ->description(fn (Trainee $record): string => $record->api_entity_no)
-                    ->searchable(['full_name', 'api_entity_no', 'contact_no'])
-                    ->sortable()
                     ->weight('semibold')
                     ->limit(45),
 
@@ -74,7 +72,10 @@ class TraineesRelationManager extends RelationManager
                     ->copyable()
                     ->placeholder('—'),
             ])
-            ->defaultSort('full_name')
+            ->searchable()
+            ->searchUsing(fn (Builder $query, string $search): Builder => $query->searchRecords($search))
+            ->searchPlaceholder('Search name, entity no., contact, or training')
+            ->defaultSort('api_entity_no')
             ->recordUrl(fn (Trainee $record): string => TraineesResource::getUrl('view', ['record' => $record]))
             ->headerActions([
                 Action::make('addTrainee')

@@ -4,9 +4,11 @@ namespace App\Models\Training;
 
 use App\Enums\TrainingStatus;
 use App\Services\Training\ScimsTrainingService;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -23,36 +25,57 @@ class Trainee extends Model
 
     protected $keyType = 'string';
 
+    /**
+     * Only the SCIMS link and the local enrollment details are stored here.
+     * Name, gender, birth date and mobile number belong to SCIMS.
+     */
     protected $fillable = [
         'id',
         'api_entity_no',
-        'full_name',
-        'gender',
-        'birth_date',
-        'mobile_no',
         'training_id',
         'training_details_id',
         'contact_no',
     ];
 
-    protected function casts(): array
-    {
-        return [
-            'birth_date' => 'date',
-        ];
-    }
+    /**
+     * Identity resolved from SCIMS for this model instance.
+     *
+     * @var array<string, mixed>|null
+     */
+    protected ?array $scimsIdentity = null;
 
-    protected static function booted(): void
+    protected bool $scimsIdentityLoaded = false;
+
+    /**
+     * Prefetch identities for hydrated result sets so a table page or export
+     * makes one batched SCIMS request instead of one request per row.
+     */
+    public function newCollection(array $models = []): Collection
     {
-        // Snapshot the SCIMS identity when a trainee is first enrolled or
-        // relinked. A failed lookup keeps whatever was stored before.
-        static::saving(function (Trainee $trainee): void {
-            if (! $trainee->isDirty('api_entity_no')) {
-                return;
+        $collection = parent::newCollection($models);
+
+        // Single-model temporary collections are created by loadMissing()
+        // and loadCount(); prefetching there would make relation loading
+        // call SCIMS for no reason.
+        if (count($models) < 2) {
+            return $collection;
+        }
+
+        $entityNos = [];
+
+        foreach ($models as $model) {
+            $entityNo = trim((string) $model->getAttribute('api_entity_no'));
+
+            if ($entityNo !== '') {
+                $entityNos[$entityNo] = true;
             }
+        }
 
-            $trainee->copyIdentityFromScims();
-        });
+        if ($entityNos !== []) {
+            app(ScimsTrainingService::class)->findIndividuals(array_keys($entityNos));
+        }
+
+        return $collection;
     }
 
     public function training(): BelongsTo
@@ -77,6 +100,37 @@ class Trainee extends Model
             'trainingDetails',
             fn (Builder $query): Builder => $query->where('status', TrainingStatus::Completed->value),
         );
+    }
+
+    /**
+     * Match the local columns and relationships plus people whose SCIMS
+     * identity matches the search term.
+     */
+    public function scopeSearchRecords(Builder $query, ?string $search): Builder
+    {
+        $search = trim((string) $search);
+
+        if ($search === '') {
+            return $query;
+        }
+
+        $escaped = str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], $search);
+        $like = '%'.$escaped.'%';
+
+        $entityNos = app(ScimsTrainingService::class)->searchIndividualEntityNumbers($search);
+
+        return $query->where(function (Builder $query) use ($like, $entityNos): void {
+            $query->where('api_entity_no', 'like', $like)
+                ->orWhere('contact_no', 'like', $like)
+                ->orWhereHas(
+                    'training',
+                    fn (Builder $training): Builder => $training->where('training_program', 'like', $like),
+                );
+
+            if ($entityNos !== []) {
+                $query->orWhereIn('api_entity_no', $entityNos);
+            }
+        });
     }
 
     /**
@@ -151,67 +205,57 @@ class Trainee extends Model
     }
 
     /**
-     * Update the local SCIMS snapshot. Returns false when SCIMS is
-     * unreachable or the person cannot be found.
+     * Re-read this person's identity from SCIMS. Nothing is written to the
+     * local database; only the temporary cache entry is cleared.
      */
-    public function refreshSnapshots(): bool
+    public function refreshIdentity(): bool
     {
-        if (! $this->copyIdentityFromScims()) {
+        if (blank($this->api_entity_no)) {
             return false;
         }
 
-        $this->saveQuietly();
+        $this->scimsIdentity = null;
+        $this->scimsIdentityLoaded = false;
 
-        return true;
+        $service = app(ScimsTrainingService::class);
+        $service->forgetIndividual($this->api_entity_no);
+
+        return is_array($this->identity());
     }
 
     /**
-     * Copy name, gender, birth date and mobile number from SCIMS.
-     */
-    public function copyIdentityFromScims(): bool
-    {
-        $individual = app(ScimsTrainingService::class)->findIndividual($this->api_entity_no);
-
-        if (! is_array($individual)) {
-            return false;
-        }
-
-        $name = ScimsTrainingService::formatName($individual);
-
-        if ($name !== '') {
-            $this->full_name = $name;
-        }
-
-        if (filled($individual['gender'] ?? null)) {
-            $this->gender = $individual['gender'];
-        }
-
-        if (filled($individual['birth_date'] ?? null)) {
-            $this->birth_date = $individual['birth_date'];
-        }
-
-        $mobile = trim((string) ($individual['mobile_no'] ?? ''));
-
-        if ($mobile !== '') {
-            $this->mobile_no = $mobile;
-        }
-
-        return true;
-    }
-
-    /**
-     * The SCIMS individual this trainee links to, resolved by api_entity_no.
-     * Used as a fallback for records created before local snapshots existed.
+     * Raw SCIMS attributes for this person, resolved once per model instance.
      *
      * @return array<string, mixed>|null
+     */
+    protected function identity(): ?array
+    {
+        if ($this->scimsIdentityLoaded) {
+            return $this->scimsIdentity;
+        }
+
+        $this->scimsIdentityLoaded = true;
+
+        if (blank($this->api_entity_no)) {
+            return $this->scimsIdentity = null;
+        }
+
+        return $this->scimsIdentity = app(ScimsTrainingService::class)
+            ->findIndividual($this->api_entity_no);
+    }
+
+    /**
+     * The SCIMS individual this trainee links to. Retained as an attribute
+     * for callers that need the raw identity parts.
+     *
+     * @return Attribute<?array<string, mixed>, never>
      */
     protected function individual(): Attribute
     {
         return Attribute::get(function (): ?array {
-            $attributes = app(ScimsTrainingService::class)
-                ->findIndividual($this->api_entity_no);
+            $attributes = $this->identity();
 
-            if (is_null($attributes)) {
+            if (! is_array($attributes)) {
                 return null;
             }
 
@@ -229,15 +273,76 @@ class Trainee extends Model
     }
 
     /**
+     * Name for lists and titles, falling back to the entity number.
+     *
+     * @return Attribute<string, never>
+     */
+    protected function fullName(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            $name = ScimsTrainingService::formatName($this->identity());
+
+            return $name !== '' ? $name : null;
+        });
+    }
+
+    /**
+     * @return Attribute<?string, never>
+     */
+    protected function gender(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            $gender = trim((string) ($this->identity()['gender'] ?? ''));
+
+            return $gender !== '' ? $gender : null;
+        });
+    }
+
+    /**
+     * @return Attribute<?CarbonInterface, never>
+     */
+    protected function birthDate(): Attribute
+    {
+        return Attribute::get(function (): ?CarbonInterface {
+            $birthDate = trim((string) ($this->identity()['birth_date'] ?? ''));
+
+            if ($birthDate === '') {
+                return null;
+            }
+
+            try {
+                return Carbon::parse($birthDate);
+            } catch (\Throwable) {
+                return null;
+            }
+        });
+    }
+
+    /**
+     * @return Attribute<?string, never>
+     */
+    protected function mobileNo(): Attribute
+    {
+        return Attribute::get(function (): ?string {
+            $mobile = trim((string) ($this->identity()['mobile_no'] ?? ''));
+
+            return $mobile !== '' ? $mobile : null;
+        });
+    }
+
+    /**
      * Name for lists and titles, falling back to SCIMS and then the entity no.
+     *
+     * @return Attribute<string, never>
      */
     protected function displayName(): Attribute
     {
-        return Attribute::get(fn (): string => filled($this->full_name)
-            ? $this->full_name
-            : ($this->individual['full_name'] ?? $this->api_entity_no));
+        return Attribute::get(fn (): string => $this->full_name ?: $this->api_entity_no);
     }
 
+    /**
+     * @return Attribute<?int, never>
+     */
     protected function age(): Attribute
     {
         return Attribute::get(fn (): ?int => $this->birth_date?->age);

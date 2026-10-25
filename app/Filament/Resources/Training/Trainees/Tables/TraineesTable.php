@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Training\Trainees\Tables;
 use App\Filament\Resources\Training\Trainees\TraineesResource;
 use App\Filament\Resources\Training\TrainingPrograms\TrainingProgramResource;
 use App\Models\Training\Trainee;
+use App\Services\Training\ScimsTrainingService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkAction;
@@ -30,12 +31,9 @@ class TraineesTable
     {
         return $table
             ->columns([
-                TextColumn::make('full_name')
+                TextColumn::make('display_name')
                     ->label('Trainee')
-                    ->state(fn (Trainee $record): string => $record->display_name)
                     ->description(fn (Trainee $record): string => $record->api_entity_no)
-                    ->searchable(['full_name', 'api_entity_no', 'contact_no'])
-                    ->sortable()
                     ->weight('semibold')
                     ->limit(45),
 
@@ -75,7 +73,6 @@ class TraineesTable
                 TextColumn::make('contact_no')
                     ->label('Contact')
                     ->icon(Heroicon::Phone)
-                    ->searchable()
                     ->copyable()
                     ->copyMessage('Copied!')
                     ->placeholder('—'),
@@ -92,7 +89,10 @@ class TraineesTable
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->defaultSort('full_name')
+            ->searchable()
+            ->searchUsing(fn (Builder $query, string $search): Builder => $query->searchRecords($search))
+            ->searchPlaceholder('Search name, entity no., contact, or training')
+            ->defaultSort('api_entity_no')
             ->recordUrl(fn (Trainee $record): string => TraineesResource::getUrl('view', ['record' => $record]))
             ->filters([
                 SelectFilter::make('training')
@@ -102,12 +102,18 @@ class TraineesTable
 
                 SelectFilter::make('gender')
                     ->label('Gender')
-                    ->options(fn (): array => Trainee::query()
-                        ->whereNotNull('gender')
-                        ->distinct()
-                        ->orderBy('gender')
-                        ->pluck('gender', 'gender')
-                        ->all()),
+                    ->options(fn (): array => app(ScimsTrainingService::class)->genderOptions(
+                        Trainee::query()->pluck('api_entity_no')->all(),
+                    ))
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                        ? $query->whereIn(
+                            'api_entity_no',
+                            app(ScimsTrainingService::class)->entityNumbersForGender(
+                                (clone $query)->pluck('api_entity_no')->all(),
+                                $data['value'],
+                            ),
+                        )
+                        : $query),
 
                 Filter::make('missing_contact')
                     ->label('Missing contact number')
@@ -197,10 +203,10 @@ class TraineesTable
                         ->label('Refresh from SCIMS')
                         ->icon(Heroicon::ArrowPath)
                         ->action(function (Trainee $record): void {
-                            if ($record->refreshSnapshots()) {
+                            if ($record->refreshIdentity()) {
                                 Notification::make()
                                     ->success()
-                                    ->title('Trainee details refreshed')
+                                    ->title('Trainee details reloaded from SCIMS')
                                     ->send();
 
                                 return;
@@ -209,7 +215,7 @@ class TraineesTable
                             Notification::make()
                                 ->warning()
                                 ->title('SCIMS details unavailable')
-                                ->body('The local snapshot was left unchanged. Try again later.')
+                                ->body('Nothing was changed locally because identity data is not stored here. Try again later.')
                                 ->send();
                         }),
 
@@ -260,21 +266,21 @@ class TraineesTable
                         ->icon(Heroicon::ArrowPath)
                         ->requiresConfirmation()
                         ->modalHeading('Refresh trainee details from SCIMS')
-                        ->modalDescription('Names, genders, birth dates and mobile numbers are updated from SCIMS. Records without a SCIMS match keep their current details.')
+                        ->modalDescription('Names, genders, birth dates and mobile numbers are re-read from SCIMS. Nothing is written to the local database.')
                         ->action(function (Collection $records): void {
                             $refreshed = 0;
                             $failed = 0;
 
                             foreach ($records as $record) {
-                                $record->refreshSnapshots() ? $refreshed++ : $failed++;
+                                $record->refreshIdentity() ? $refreshed++ : $failed++;
                             }
 
                             $notification = $refreshed > 0
-                                ? Notification::make()->success()->title($refreshed.' trainee(s) refreshed')
+                                ? Notification::make()->success()->title($refreshed.' trainee(s) reloaded from SCIMS')
                                 : Notification::make()->warning()->title('SCIMS details unavailable');
 
                             if ($failed > 0) {
-                                $notification->body($failed.' trainee(s) kept their existing details.');
+                                $notification->body($failed.' trainee(s) could not be resolved from SCIMS.');
                             }
 
                             $notification->send();

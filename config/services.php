@@ -37,6 +37,11 @@ return [
 
     'scims' => [
         'base_url' => env('SCIMS_BASE_URL', 'https://cictd.app/api/scims'),
+
+        // Trainee identity data is read from SCIMS on demand. Keep its
+        // short-lived cache off the database store so names, genders, birth
+        // dates and mobile numbers are never written to SQL.
+        'cache_store' => env('SCIMS_CACHE_STORE', 'file'),
     ],
 
 ];

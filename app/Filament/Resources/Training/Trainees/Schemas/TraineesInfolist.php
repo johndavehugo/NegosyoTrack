@@ -17,13 +17,12 @@ class TraineesInfolist
         return $schema
             ->components([
                 Section::make('SCIMS identity')
-                    ->description('The person snapshot saved with this enrollment.')
+                    ->description('Read live from SCIMS. These details are not stored in this application.')
                     ->icon(Heroicon::Identification)
                     ->columns(3)
                     ->schema([
-                        TextEntry::make('full_name')
+                        TextEntry::make('display_name')
                             ->label('Name')
-                            ->state(fn (Trainee $record): string => $record->display_name)
                             ->weight('semibold')
                             ->columnSpanFull(),
 
@@ -40,7 +39,6 @@ class TraineesInfolist
 
                         TextEntry::make('age')
                             ->label('Age')
-                            ->state(fn (Trainee $record): ?int => $record->age)
                             ->suffix(' years old')
                             ->placeholder('—'),
 

@@ -119,10 +119,10 @@ class ViewTrainees extends ViewRecord
                 ->icon(Heroicon::ArrowPath)
                 ->color('gray')
                 ->action(function (): void {
-                    if ($this->getRecord()->refreshSnapshots()) {
+                    if ($this->getRecord()->refreshIdentity()) {
                         Notification::make()
                             ->success()
-                            ->title('Trainee details refreshed')
+                            ->title('Trainee details reloaded from SCIMS')
                             ->send();
 
                         return;
@@ -131,7 +131,7 @@ class ViewTrainees extends ViewRecord
                     Notification::make()
                         ->warning()
                         ->title('SCIMS details unavailable')
-                        ->body('The local snapshot was left unchanged. Try again later.')
+                        ->body('Nothing was changed locally because identity data is not stored here. Try again later.')
                         ->send();
                 }),
 
