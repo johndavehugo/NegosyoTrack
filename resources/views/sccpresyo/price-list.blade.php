@@ -290,6 +290,17 @@
             </div>
         </div>
 
+        {{-- Mobile-only filter form. The mobile selects use the form attribute
+             below so the hidden desktop selects cannot override their values. --}}
+        <form method="GET" action="{{ route('sccpresyo.index') }}" id="mobile-filter-form" class="hidden">
+            @if (filled($search))
+                <input type="hidden" name="search" value="{{ $search }}">
+            @endif
+            @if (filled($agencyId))
+                <input type="hidden" name="agency" value="{{ $agencyId }}">
+            @endif
+        </form>
+
         {{-- Filter form --}}
         <form method="GET" action="{{ route('sccpresyo.index') }}" id="filter-form">
 
@@ -355,7 +366,8 @@
 
                 {{-- Row 2: Category + Sort dropdowns side by side --}}
                 <div class="flex items-center gap-2">
-                    <select name="category" onchange="this.form.submit()"
+                    <select name="category" form="mobile-filter-form"
+                        onchange="document.getElementById('mobile-filter-form').submit()"
                         class="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
                                shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
                                appearance-none cursor-pointer font-medium">
@@ -367,7 +379,8 @@
                         @endforeach
                     </select>
 
-                    <select name="sort" onchange="this.form.submit()"
+                    <select name="sort" form="mobile-filter-form"
+                        onchange="document.getElementById('mobile-filter-form').submit()"
                         class="flex-1 min-w-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700
                                shadow-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent
                                appearance-none cursor-pointer font-medium">
