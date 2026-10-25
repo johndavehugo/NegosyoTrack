@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages\Msme;
 
+use App\Models\Msme\Negosyo;
 use App\Services\ScimsJuridicalApiService;
 use BackedEnum;
 use Filament\Pages\Page;
@@ -13,15 +14,17 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Pagination\LengthAwarePaginator;
-use App\Filament\Pages\Msme\ViewBusiness;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
 class Businesses extends Page implements HasTable
 {
     use InteractsWithTable;
+
     protected string $view = 'filament.pages.msme.businesses';
+
     protected static ?string $navigationLabel = 'Business List';
+
     protected static string|BackedEnum|null $navigationIcon = Heroicon::BuildingOffice2;
 
     public static function getNavigationBadgeColor(): string|array|null
@@ -43,7 +46,8 @@ class Businesses extends Page implements HasTable
                 return null;
             });
         } catch (\Throwable $e) {
-            logger()->error('Badge API Breakdown: ' . $e->getMessage());
+            logger()->error('Badge API Breakdown: '.$e->getMessage());
+
             return null;
         }
     }
@@ -63,13 +67,31 @@ class Businesses extends Page implements HasTable
         return $table
             ->deferLoading()
             ->records(function (ScimsJuridicalApiService $scimsApi, int $page, int $recordsPerPage, ?string $search, ?string $sortColumn, ?string $sortDirection): LengthAwarePaginator {
-                return $scimsApi->getBusiness(
+                $businesses = $scimsApi->getBusiness(
                     page: $page,
                     recordsPerPage: $recordsPerPage,
                     search: $search,
                     sortColumn: $sortColumn,
                     sortDirection: $sortDirection
                 );
+
+                $negosyos = Negosyo::query()
+                    ->whereIn(
+                        'api_entity_no',
+                        $businesses->getCollection()->pluck('entity_no')->filter()->values()->all()
+                    )
+                    ->get()
+                    ->keyBy('api_entity_no');
+
+                $businesses->setCollection(
+                    $businesses->getCollection()->map(function (array $business) use ($negosyos): array {
+                        $business['category'] = $negosyos->get($business['entity_no'] ?? '')?->category ?: null;
+
+                        return $business;
+                    })
+                );
+
+                return $businesses;
             })
             ->columns([
                 TextColumn::make('entity_no')
@@ -85,15 +107,27 @@ class Businesses extends Page implements HasTable
                 TextColumn::make('status')
                     ->toggleable()
                     ->badge()
-                    ->color(fn(string $state): array => match ($state) {
+                    ->color(fn (string $state): array => match ($state) {
                         'NEW' => Color::Blue,
                         'RENEW' => Color::Green,
                     })
-                    ->icon(fn(string $state): Heroicon => match ($state) {
+                    ->icon(fn (string $state): Heroicon => match ($state) {
                         'NEW' => Heroicon::Sparkles,
                         'RENEW' => Heroicon::CheckBadge,
                     })
                     ->alignCenter(),
+                TextColumn::make('category')
+                    ->label('Category')
+                    ->badge()
+                    ->placeholder('uncategorized')
+                    ->color(fn (?string $state): array => match ($state) {
+                        'MICRO' => Color::Green,
+                        'SMALL' => Color::Blue,
+                        'MEDIUM' => Color::Amber,
+                        default => Color::Gray,
+                    })
+                    ->alignCenter()
+                    ->toggleable(),
             ])
             ->filters([
                 SelectFilter::make('status')

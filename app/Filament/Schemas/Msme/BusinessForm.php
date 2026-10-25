@@ -3,6 +3,7 @@
 namespace App\Filament\Schemas\Msme;
 
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Fieldset;
@@ -51,6 +52,30 @@ class BusinessForm
                                         ->disabled(),
                                 ]),
 
+                            Fieldset::make('MSME Classification')
+                                ->schema([
+                                    Select::make('special_category')
+                                        ->label('Special Category')
+                                        ->options([
+                                            'None' => 'None',
+                                            '4ps Benificiary' => '4Ps Beneficiary',
+                                            'Solo Parent' => 'Solo Parent',
+                                            'Person with Disability (PWD)' => 'Person with Disability (PWD)',
+                                            'Young Entrepreneur' => 'Young Entrepreneur',
+                                        ])
+                                        ->default('None')
+                                        ->required(),
+
+                                    TextInput::make('capitalization')
+                                        ->label('Capitalization')
+                                        ->numeric()
+                                        ->prefix('₱')
+                                        ->minValue(0)
+                                        ->step(0.01)
+                                        ->required()
+                                        ->helperText('The MSME category is set automatically from this amount.'),
+                                ]),
+
                             Fieldset::make('Address Details')
                                 ->schema([
                                     TextInput::make('region')
@@ -82,8 +107,8 @@ class BusinessForm
                             TextInput::make('total_workforce')
                                 ->label('Workforce')
                                 ->disabled(),
-                        ])
-                ])
+                        ]),
+                ]),
 
         ];
     }
