@@ -45,23 +45,6 @@ class TrainingProgramInfolist
                             ->placeholder('—'),
                     ]),
 
-                Section::make('Business')
-                    ->icon(Heroicon::BuildingOffice2)
-                    ->columns(2)
-                    ->schema([
-                        TextEntry::make('business_name')
-                            ->label('Business name')
-                            ->state(fn (Training $record): string => $record->business_display_name)
-                            ->weight('semibold'),
-
-                        TextEntry::make('entity_no')
-                            ->label('SCIMS entity no.')
-                            ->badge()
-                            ->color('gray')
-                            ->copyable()
-                            ->copyMessage('Copied!'),
-                    ]),
-
                 Section::make('Schedule & outcome')
                     ->icon(Heroicon::CalendarDays)
                     ->columns(3)

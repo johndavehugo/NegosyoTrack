@@ -76,10 +76,6 @@ class TraineesInfolist
                                 : null)
                             ->columnSpanFull(),
 
-                        TextEntry::make('training.business_name')
-                            ->label('Business')
-                            ->state(fn (Trainee $record): string => $record->training?->business_display_name ?? '—'),
-
                         TextEntry::make('training.schedule_label')
                             ->label('Schedule')
                             ->state(fn (Trainee $record): string => $record->training?->schedule_label ?? '—'),

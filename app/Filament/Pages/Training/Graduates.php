@@ -5,22 +5,30 @@ namespace App\Filament\Pages\Training;
 use App\Enums\TrainingStatus;
 use App\Filament\Resources\Training\Trainees\TraineesResource;
 use App\Filament\Resources\Training\TrainingPrograms\TrainingProgramResource;
+use App\Filament\Widgets\GraduatesStatsWidget;
 use App\Models\Training\Trainee;
 use App\Models\Training\Training;
 use App\Models\Training\TrainingDetail;
+use App\Services\Training\GraduatesExporter;
 use BackedEnum;
+use Carbon\Carbon;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
+use Filament\Actions\BulkActionGroup;
 use Filament\Forms\Components\DatePicker;
+use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class Graduates extends Page implements HasTable
 {
@@ -60,6 +68,53 @@ class Graduates extends Page implements HasTable
         return 'Graduates across all training records';
     }
 
+    /**
+     * @return array<class-string<GraduatesStatsWidget>>
+     */
+    protected function getHeaderWidgets(): array
+    {
+        return [
+            GraduatesStatsWidget::class,
+        ];
+    }
+
+    public function getHeaderWidgetsColumns(): int
+    {
+        return 1;
+    }
+
+    /**
+     * @return array<Action>
+     */
+    protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('exportGraduates')
+                ->label('Export')
+                ->icon(Heroicon::ArrowDownTray)
+                ->color('gray')
+                ->schema([
+                    Select::make('format')
+                        ->label('File format')
+                        ->options([
+                            'csv' => 'CSV (spreadsheet)',
+                            'xlsx' => 'Excel (XLSX)',
+                        ])
+                        ->default('csv')
+                        ->required(),
+                ])
+                ->action(fn (array $data) => app(GraduatesExporter::class)->download(
+                    $this->getFilteredTableQuery() ?? Trainee::query()->graduates(),
+                    $data['format'],
+                )),
+
+            Action::make('openTrainees')
+                ->label('Mark graduates')
+                ->icon(Heroicon::UserPlus)
+                ->url(TraineesResource::getUrl('index')),
+        ];
+    }
+
     public function table(Table $table): Table
     {
         return $table
@@ -72,7 +127,6 @@ class Graduates extends Page implements HasTable
                 TextColumn::make('full_name')
                     ->label('Graduate')
                     ->state(fn (Trainee $record): string => $record->display_name)
-                    ->description(fn (Trainee $record): string => $record->api_entity_no)
                     ->searchable(['full_name', 'api_entity_no', 'contact_no'])
                     ->sortable()
                     ->weight('semibold')
@@ -88,15 +142,10 @@ class Graduates extends Page implements HasTable
                         ? TrainingProgramResource::getUrl('view', ['record' => $record->training])
                         : null),
 
-                TextColumn::make('business')
-                    ->label('Business')
-                    ->state(fn (Trainee $record): string => $record->training?->business_display_name ?? '—')
-                    ->wrap(),
-
                 TextColumn::make('trainingDetails.graduated_at')
                     ->label('Graduated')
                     ->date('M d, Y')
-                    ->description(fn (Trainee $record): ?string => $record->trainingDetails?->status?->getLabel())
+                    ->description(fn (Trainee $record): ?string => $record->training?->training_type)
                     ->icon(Heroicon::CheckBadge)
                     ->color('success')
                     ->sortable(),
@@ -109,20 +158,22 @@ class Graduates extends Page implements HasTable
                     ->copyMessage('Copied!')
                     ->placeholder('—'),
 
+                TextColumn::make('training.sector')
+                    ->label('Sector')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 TextColumn::make('gender')
                     ->label('Gender')
                     ->badge()
                     ->color('gray')
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
-
-                TextColumn::make('training.training_type')
-                    ->label('Training type')
-                    ->placeholder('—')
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('trainingDetails.graduated_at', 'desc')
             ->recordUrl(fn (Trainee $record): string => TraineesResource::getUrl('view', ['record' => $record]))
+            ->searchPlaceholder('Search name, entity no., or contact')
+            ->persistSearchInSession()
             ->filters([
                 SelectFilter::make('graduation_year')
                     ->label('Graduation year')
@@ -142,27 +193,88 @@ class Graduates extends Page implements HasTable
                         )
                         : $query),
 
+                Filter::make('graduated_between')
+                    ->label('Graduation date range')
+                    ->schema([
+                        DatePicker::make('from')->label('From'),
+                        DatePicker::make('until')->label('Until'),
+                    ])
+                    ->query(fn (Builder $query, array $data): Builder => $query
+                        ->when(
+                            filled($data['from'] ?? null),
+                            fn (Builder $query): Builder => $query->whereHas(
+                                'trainingDetails',
+                                fn (Builder $query): Builder => $query->whereDate('graduated_at', '>=', $data['from']),
+                            ),
+                        )
+                        ->when(
+                            filled($data['until'] ?? null),
+                            fn (Builder $query): Builder => $query->whereHas(
+                                'trainingDetails',
+                                fn (Builder $query): Builder => $query->whereDate('graduated_at', '<=', $data['until']),
+                            ),
+                        ))
+                    ->indicateUsing(function (array $data): array {
+                        $indicators = [];
+
+                        if (filled($data['from'] ?? null)) {
+                            $indicators[] = 'From '.Carbon::parse($data['from'])->toFormattedDateString();
+                        }
+
+                        if (filled($data['until'] ?? null)) {
+                            $indicators[] = 'Until '.Carbon::parse($data['until'])->toFormattedDateString();
+                        }
+
+                        return $indicators;
+                    }),
+
                 SelectFilter::make('training')
                     ->label('Training program')
                     ->relationship('training', 'training_program')
                     ->searchable(),
 
-                SelectFilter::make('business')
-                    ->label('Business')
-                    ->options(fn (): array => Training::query()
-                        ->whereIn('id', Trainee::query()->graduates()->select('training_id'))
-                        ->whereNotNull('business_name')
-                        ->orderBy('business_name')
-                        ->pluck('business_name', 'entity_no')
-                        ->all())
+                SelectFilter::make('training_type')
+                    ->label('Training type')
                     ->searchable()
+                    ->options(fn (): array => Training::query()
+                        ->whereNotNull('training_type')
+                        ->distinct()
+                        ->orderBy('training_type')
+                        ->pluck('training_type', 'training_type')
+                        ->all())
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
                         ? $query->whereHas(
                             'training',
-                            fn (Builder $query): Builder => $query->where('entity_no', $data['value']),
+                            fn (Builder $query): Builder => $query->where('training_type', $data['value']),
                         )
                         : $query),
+
+                SelectFilter::make('sector')
+                    ->label('Sector')
+                    ->searchable()
+                    ->options(fn (): array => Training::query()
+                        ->whereNotNull('sector')
+                        ->distinct()
+                        ->orderBy('sector')
+                        ->pluck('sector', 'sector')
+                        ->all())
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                        ? $query->whereHas(
+                            'training',
+                            fn (Builder $query): Builder => $query->where('sector', $data['value']),
+                        )
+                        : $query),
+
+                SelectFilter::make('gender')
+                    ->label('Gender')
+                    ->options(fn (): array => Trainee::query()
+                        ->whereNotNull('gender')
+                        ->distinct()
+                        ->orderBy('gender')
+                        ->pluck('gender', 'gender')
+                        ->all()),
             ])
+            ->persistFiltersInSession()
             ->recordActions([
                 ActionGroup::make([
                     Action::make('viewTrainee')
@@ -185,17 +297,53 @@ class Graduates extends Page implements HasTable
                         ->fillForm(fn (Trainee $record): array => [
                             'graduated_at' => $record->trainingDetails?->graduated_at?->toDateString(),
                         ])
-                        ->schema([
+                        ->schema(fn (Trainee $record): array => [
                             DatePicker::make('graduated_at')
                                 ->label('Graduated on')
-                                ->required(),
+                                ->required()
+                                ->minDate($record->training?->to_date?->toDateString())
+                                ->helperText($record->training?->to_date
+                                    ? 'Must be on or after the training end date ('.$record->training->to_date->format('M d, Y').').'
+                                    : null),
                         ])
                         ->action(function (Trainee $record, array $data): void {
+                            $minimum = $record->training?->to_date;
+
+                            if ($minimum && Carbon::parse($data['graduated_at'])->lt($minimum)) {
+                                Notification::make()
+                                    ->danger()
+                                    ->title('Invalid graduation date')
+                                    ->body('The graduation date cannot be earlier than the training end date ('.$minimum->format('M d, Y').').')
+                                    ->send();
+
+                                return;
+                            }
+
                             $record->updateGraduationDate($data['graduated_at']);
 
                             Notification::make()
                                 ->success()
                                 ->title('Graduation date updated')
+                                ->send();
+                        }),
+
+                    Action::make('refreshScims')
+                        ->label('Refresh from SCIMS')
+                        ->icon(Heroicon::ArrowPath)
+                        ->action(function (Trainee $record): void {
+                            if ($record->refreshSnapshots()) {
+                                Notification::make()
+                                    ->success()
+                                    ->title('Graduate details refreshed')
+                                    ->send();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->warning()
+                                ->title('SCIMS details unavailable')
+                                ->body('The local snapshot was left unchanged. Try again later.')
                                 ->send();
                         }),
 
@@ -218,6 +366,100 @@ class Graduates extends Page implements HasTable
                 ])
                     ->icon(Heroicon::EllipsisVertical)
                     ->tooltip('Actions'),
+            ])
+            ->toolbarActions([
+                BulkActionGroup::make([
+                    BulkAction::make('exportSelected')
+                        ->label('Export selected')
+                        ->icon(Heroicon::ArrowDownTray)
+                        ->schema([
+                            Select::make('format')
+                                ->label('File format')
+                                ->options([
+                                    'csv' => 'CSV (spreadsheet)',
+                                    'xlsx' => 'Excel (XLSX)',
+                                ])
+                                ->default('csv')
+                                ->required(),
+                        ])
+                        ->action(fn (Collection $records, array $data) => app(GraduatesExporter::class)->download(
+                            Trainee::query()->whereKey($records->pluck('id')->all()),
+                            $data['format'],
+                        ))
+                        ->deselectRecordsAfterCompletion(),
+
+                    BulkAction::make('setGraduationDate')
+                        ->label('Set graduation date')
+                        ->icon(Heroicon::CalendarDays)
+                        ->schema([
+                            DatePicker::make('graduated_at')
+                                ->label('Graduated on')
+                                ->required(),
+                        ])
+                        ->modalHeading('Set graduation date for selected graduates')
+                        ->modalDescription('Records whose training ended after the chosen date are skipped.')
+                        ->action(function (Collection $records, array $data): void {
+                            $date = Carbon::parse($data['graduated_at']);
+                            $updated = 0;
+                            $skipped = 0;
+
+                            foreach ($records as $record) {
+                                /** @var Trainee $record */
+                                if (! $record->isGraduate()) {
+                                    $skipped++;
+
+                                    continue;
+                                }
+
+                                $trainingEnd = $record->training?->to_date;
+
+                                if ($trainingEnd && $date->lt($trainingEnd)) {
+                                    $skipped++;
+
+                                    continue;
+                                }
+
+                                $record->updateGraduationDate($date->toDateString())
+                                    ? $updated++
+                                    : $skipped++;
+                            }
+
+                            $notification = $updated > 0
+                                ? Notification::make()->success()->title($updated.' graduation date(s) updated')
+                                : Notification::make()->warning()->title('No graduation dates were updated');
+
+                            if ($skipped > 0) {
+                                $notification->body($skipped.' record(s) were skipped because the date was before the training end date.');
+                            }
+
+                            $notification->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+
+                    BulkAction::make('removeGraduates')
+                        ->label('Remove from graduates')
+                        ->icon(Heroicon::XCircle)
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->modalHeading('Remove selected graduates')
+                        ->modalDescription('Their completion records and graduation dates are deleted. The trainees stay enrolled in their trainings.')
+                        ->action(function (Collection $records): void {
+                            $removed = 0;
+
+                            foreach ($records as $record) {
+                                /** @var Trainee $record */
+                                if ($record->removeGraduateRecord()) {
+                                    $removed++;
+                                }
+                            }
+
+                            Notification::make()
+                                ->success()
+                                ->title($removed.' graduate record(s) removed')
+                                ->send();
+                        })
+                        ->deselectRecordsAfterCompletion(),
+                ]),
             ])
             ->paginated([10, 25, 50])
             ->defaultPaginationPageOption(10)
