@@ -46,8 +46,14 @@ class GraduatesExporter
         $graduates = $query
             ->with(['training', 'trainingDetails'])
             ->reorder()
-            ->orderBy('full_name')
-            ->get();
+            ->get()
+            // Names live in SCIMS, so alphabetical ordering happens after the
+            // collection's batch identity prefetch rather than in SQL.
+            ->sortBy(
+                fn (Trainee $graduate): string => $graduate->display_name,
+                SORT_NATURAL | SORT_FLAG_CASE,
+            )
+            ->values();
 
         $path = tempnam(sys_get_temp_dir(), 'training-graduates-');
 

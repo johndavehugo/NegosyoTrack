@@ -2,9 +2,10 @@
 
 namespace App\Providers;
 
-use App\Support\Filesystem;
 use App\Models\PriceMonitoring\CommodityVariant;
 use App\Observers\PriceMonitoring\CommodityVariantObserver;
+use App\Services\Training\ScimsTrainingService;
+use App\Support\Filesystem;
 use Filament\Support\Facades\FilamentColor;
 use Illuminate\Support\ServiceProvider;
 
@@ -17,6 +18,10 @@ class AppServiceProvider extends ServiceProvider
     {
         // Windows-safe replacement used when Blade compiles view files.
         $this->app->singleton('files', fn () => new Filesystem);
+
+        // One instance per request/job so batch identity lookups are reused
+        // by every model and column without hitting SCIMS again.
+        $this->app->scoped(ScimsTrainingService::class);
     }
 
     /**

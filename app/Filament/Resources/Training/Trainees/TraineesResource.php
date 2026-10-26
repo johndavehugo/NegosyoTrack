@@ -10,6 +10,7 @@ use App\Filament\Resources\Training\Trainees\Schemas\TraineesForm;
 use App\Filament\Resources\Training\Trainees\Schemas\TraineesInfolist;
 use App\Filament\Resources\Training\Trainees\Tables\TraineesTable;
 use App\Models\Training\Trainee;
+use App\Services\Training\ScimsTrainingService;
 use BackedEnum;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
@@ -33,7 +34,7 @@ class TraineesResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
-    protected static ?string $recordTitleAttribute = 'full_name';
+    protected static ?string $recordTitleAttribute = 'api_entity_no';
 
     public static function getNavigationGroup(): ?string
     {
@@ -103,10 +104,27 @@ class TraineesResource extends Resource
     public static function getGloballySearchableAttributes(): array
     {
         return [
-            'full_name',
             'api_entity_no',
             'contact_no',
         ];
+    }
+
+    /**
+     * SCIMS holds names, so extend the local global search with the entity
+     * numbers whose SCIMS identity matches the term.
+     */
+    public static function modifyGlobalSearchQuery(Builder $query, string $search): void
+    {
+        $entityNos = app(ScimsTrainingService::class)->searchIndividualEntityNumbers($search);
+
+        if ($entityNos === []) {
+            return;
+        }
+
+        $query->orWhereIn(
+            $query->getModel()->qualifyColumn('api_entity_no'),
+            $entityNos,
+        );
     }
 
     public static function getGlobalSearchResultDetails(Model $record): array

@@ -2,8 +2,11 @@
 
 namespace App\Filament\Pages\Msme;
 
+use App\Filament\Actions\RowClickAction;
 use App\Services\ScimsJuridicalApiService;
 use Filament\Pages\Page;
+use Filament\Support\Enums\Width;
+use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -83,6 +86,20 @@ class Employees extends Page implements HasTable
             ->filters([
 
             ])
+            ->recordActions([
+                RowClickAction::make('viewTrainings')
+                    ->hidden()
+                    ->modalHeading(fn (array $record): string => $record['employee_fullname'] ?? 'Trainings')
+                    ->modalDescription(fn (array $record): string => 'Entity No. '.($record['entity_no'] ?? '—'))
+                    ->modalIcon(Heroicon::AcademicCap)
+                    ->modalWidth(Width::ThreeExtraLarge)
+                    ->modalContent(fn (array $record) => view('filament.pages.msme.employee-trainings', [
+                        'trainings' => $record['trainings'] ?? [],
+                    ]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Close'),
+            ])
+            ->recordAction('viewTrainings')
             ->paginated([10, 25, 50])
             ->defaultPaginationPageOption(10)
             ->searchable();

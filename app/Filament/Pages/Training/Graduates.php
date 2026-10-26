@@ -10,6 +10,7 @@ use App\Models\Training\Trainee;
 use App\Models\Training\Training;
 use App\Models\Training\TrainingDetail;
 use App\Services\Training\GraduatesExporter;
+use App\Services\Training\ScimsTrainingService;
 use BackedEnum;
 use Carbon\Carbon;
 use Filament\Actions\Action;
@@ -124,11 +125,8 @@ class Graduates extends Page implements HasTable
                     ->with(['training', 'trainingDetails'])
             )
             ->columns([
-                TextColumn::make('full_name')
+                TextColumn::make('display_name')
                     ->label('Graduate')
-                    ->state(fn (Trainee $record): string => $record->display_name)
-                    ->searchable(['full_name', 'api_entity_no', 'contact_no'])
-                    ->sortable()
                     ->weight('semibold')
                     ->limit(45),
 
@@ -153,7 +151,6 @@ class Graduates extends Page implements HasTable
                 TextColumn::make('contact_no')
                     ->label('Contact')
                     ->icon(Heroicon::Phone)
-                    ->searchable()
                     ->copyable()
                     ->copyMessage('Copied!')
                     ->placeholder('—'),
@@ -170,9 +167,11 @@ class Graduates extends Page implements HasTable
                     ->placeholder('—')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->searchable()
+            ->searchUsing(fn (Builder $query, string $search): Builder => $query->searchRecords($search))
             ->defaultSort('trainingDetails.graduated_at', 'desc')
             ->recordUrl(fn (Trainee $record): string => TraineesResource::getUrl('view', ['record' => $record]))
-            ->searchPlaceholder('Search name, entity no., or contact')
+            ->searchPlaceholder('Search name, entity no., contact, or training')
             ->persistSearchInSession()
             ->filters([
                 SelectFilter::make('graduation_year')
@@ -267,12 +266,18 @@ class Graduates extends Page implements HasTable
 
                 SelectFilter::make('gender')
                     ->label('Gender')
-                    ->options(fn (): array => Trainee::query()
-                        ->whereNotNull('gender')
-                        ->distinct()
-                        ->orderBy('gender')
-                        ->pluck('gender', 'gender')
-                        ->all()),
+                    ->options(fn (): array => app(ScimsTrainingService::class)->genderOptions(
+                        Trainee::query()->graduates()->pluck('api_entity_no')->all(),
+                    ))
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                        ? $query->whereIn(
+                            'api_entity_no',
+                            app(ScimsTrainingService::class)->entityNumbersForGender(
+                                (clone $query)->pluck('api_entity_no')->all(),
+                                $data['value'],
+                            ),
+                        )
+                        : $query),
             ])
             ->persistFiltersInSession()
             ->recordActions([
@@ -331,10 +336,10 @@ class Graduates extends Page implements HasTable
                         ->label('Refresh from SCIMS')
                         ->icon(Heroicon::ArrowPath)
                         ->action(function (Trainee $record): void {
-                            if ($record->refreshSnapshots()) {
+                            if ($record->refreshIdentity()) {
                                 Notification::make()
                                     ->success()
-                                    ->title('Graduate details refreshed')
+                                    ->title('Graduate details reloaded from SCIMS')
                                     ->send();
 
                                 return;
@@ -343,7 +348,7 @@ class Graduates extends Page implements HasTable
                             Notification::make()
                                 ->warning()
                                 ->title('SCIMS details unavailable')
-                                ->body('The local snapshot was left unchanged. Try again later.')
+                                ->body('Nothing was changed locally because identity data is not stored here. Try again later.')
                                 ->send();
                         }),
 
