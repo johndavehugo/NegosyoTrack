@@ -27,6 +27,11 @@ class PriceListOverview extends StatsOverviewWidget
                 ->description('Missing Prevailing Price')
                 ->descriptionIcon(Heroicon::XCircle)
                 ->color(Color::Red),
+
+            Stat::make('', CommodityVariant::overSrp()->count())
+                ->description('Flagged Above SRP (>10%)')
+                ->descriptionIcon(Heroicon::ExclamationTriangle)
+                ->color(Color::Orange),
         ];
     }
 }
